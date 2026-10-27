@@ -1,0 +1,20 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime
+*.db
+*.db-shm
+*.db-wal
+*.log
+~$*.xlsx
+Thumbs.db
+.DS_Store

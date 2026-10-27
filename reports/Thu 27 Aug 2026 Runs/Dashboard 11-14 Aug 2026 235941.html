@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>In-Swing Report Viewer</title>
+    <style>
+
+    @font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 100 900; font-display: swap; size-adjust: 105%; src: local('IBM Plex Sans'), url('/app-static/ibm-plex-sans-latin-wght-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-style: italic; font-weight: 100 900; font-display: swap; size-adjust: 105%; src: local('IBM Plex Sans Italic'), url('/app-static/ibm-plex-sans-latin-wght-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans Fallback'; src: local('Arial'); ascent-override: 101%; descent-override: 27%; line-gap-override: 0%; size-adjust: 105%; }
+    :root {
+        color-scheme: light;
+        --fv-font-sans: 'IBM Plex Sans', 'IBM Plex Sans Fallback', Arial, sans-serif;
+        --fv-white: #ffffff;
+        --fv-gray-50: #f3f3f5; --fv-gray-100: #dedfe5; --fv-gray-200: #c3c6d0;
+        --fv-gray-300: #a3a8b9; --fv-gray-400: #868ea5; --fv-gray-500: #676f85;
+        --fv-gray-600: #4c5263; --fv-gray-700: #353945; --fv-gray-750: #2c303b;
+        --fv-gray-800: #22262f; --fv-gray-900: #14161d;
+        --fv-blue-50: #ebf4fe; --fv-blue-100: #cae2fc; --fv-blue-200: #9bcbfa;
+        --fv-blue-400: #2f91ef; --fv-blue-500: #306dca;
+        --fv-green-50: #e7f7e8; --fv-green-100: #beeac1; --fv-green-200: #86d895;
+        --fv-green-400: #00a449; --fv-green-500: #19803d;
+        --fv-red-50: #fef0f0; --fv-red-100: #fcd6d6; --fv-red-200: #fbb4b4; --fv-red-500: #d91e2b;
+        --fv-yellow-50: #fdf2df; --fv-yellow-100: #fcdc86; --fv-yellow-200: #f3c736;
+        --fv-yellow-300: #cda30b; --fv-yellow-400: #b08900; --fv-yellow-500: #8b6a00;
+    }
+    html, body, button, input, select, textarea, table, summary, details {
+        font-family: var(--fv-font-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    tbody tr:nth-child(2n) { background: #f3f3f5; }
+    tbody tr:hover { background: #e9eaee; }
+    /* Neutralise the UA's blue for checkboxes, focus rings and selection. */
+    input, select, textarea, button { accent-color: #4c5263; }
+    :focus-visible { outline: 2px solid #676f85; outline-offset: 1px; }
+    ::selection { background: #c3c6d0; color: #14161d; }
+
+    /* ------------------------------------------------------------------
+       Theme switch control (shown in page headers, works in both themes)
+       ------------------------------------------------------------------ */
+    .header-right { justify-self: end; display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
+    .theme-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: rgba(255,255,255,0.85); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+    .theme-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .theme-switch-track { position: relative; width: 30px; height: 16px; border-radius: 999px; background: rgba(255,255,255,0.25); transition: background 0.2s; }
+    .theme-switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff; transition: transform 0.2s, background 0.2s; }
+    .theme-switch input:checked + .theme-switch-track { background: #00c853; }
+    .theme-switch input:checked + .theme-switch-track::after { transform: translateX(14px); background: #06130b; }
+
+    /* ------------------------------------------------------------------
+       App dark theme (BlockTrade-inspired palette)
+       Surfaces: #080B0D / #111715 / #1A1F1C / #232927  Border: #2E3431
+       Text: #F2F4F3 / #A8B2AD  Accents: green #00C853, red #FF5252,
+       amber #FFC107, blue #2962FF
+       ------------------------------------------------------------------ */
+    /* Card/section header band: single knob used by every header rule below
+       (screener cards, watchlist, saved reports, history, chart modal). */
+    body.dark-theme { color-scheme: dark; background: #080b0d; color: #f2f4f3; --card-head-bg: radial-gradient(circle at 18% 0%, rgba(255,255,255,0.08), transparent 42%), linear-gradient(135deg, #050607 0%, #171b1f 48%, #050607 100%); --card-head-border: rgba(255,255,255,0.12); }
+    body.dark-theme tbody tr:nth-child(2n) { background: #141917; }
+    body.dark-theme tbody tr:hover { background: #1d2421; }
+    body.dark-theme input, body.dark-theme select, body.dark-theme textarea, body.dark-theme button { accent-color: #00c853; }
+    body.dark-theme :focus-visible { outline-color: #00c853; }
+    body.dark-theme ::selection { background: #00c853; color: #06130b; }
+    body.dark-theme input[type="text"], body.dark-theme input[type="date"], body.dark-theme input[type="search"], body.dark-theme select, body.dark-theme textarea { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme input::placeholder { color: #6c7570; }
+    body.dark-theme input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+    /* Header / navigation */
+    body.dark-theme .header { background: radial-gradient(circle at 14% 0%, rgba(0,200,83,0.20), transparent 34%), linear-gradient(90deg, #020a07 0%, #052214 42%, #020a07 100%); border: 0; border-bottom: 1px solid rgba(0,200,83,0.18); box-shadow: none; }
+    body.dark-theme .brand-logo { filter: brightness(0) saturate(100%) invert(77%) sepia(69%) saturate(814%) hue-rotate(359deg) brightness(101%) contrast(95%) drop-shadow(0 0 10px rgba(243,199,54,0.24)); opacity: 0.98; }
+    body.dark-theme .report-title { color: #ffffff; text-shadow: none; }
+    body.dark-theme .report-subtitle { color: #ffffff; opacity: 0.82; }
+    body.dark-theme .live-clock { color: #ffffff; }
+    body.dark-theme .live-clock span { color: #f2f4f3; }
+    body.dark-theme .theme-switch { color: #ffffff; }
+    body.dark-theme .tabs { background: rgba(0,0,0,0.26); border-color: rgba(163,230,53,0.16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(0,200,83,0.08); }
+    body.dark-theme .tabs button { color: rgba(255,255,255,0.82); }
+    body.dark-theme .tabs button:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+    body.dark-theme .tabs button.active { background: linear-gradient(135deg, #00c853, #059669); color: #06130b; box-shadow: 0 0 0 1px rgba(163,230,53,0.52), 0 0 22px rgba(0,200,83,0.42); }
+    body.dark-theme .tabs button:disabled, body.dark-theme .tabs button.disabled-tab { color: rgba(255,255,255,0.24); }
+
+    /* Cards / panels */
+    body.dark-theme .card, body.dark-theme details.card { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    /* Card headers: clearly distinct band — lighter surface, separator line and
+       a green accent edge so sections read at a glance. */
+    body.dark-theme .card h2, body.dark-theme .card-title-row, body.dark-theme details.card summary { background: var(--card-head-bg); color: #f2f4f3; border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .card-title-row h2 { background: none; border-bottom: 0; box-shadow: none; }
+    body.dark-theme label span { color: #a8b2ad; }
+    body.dark-theme .checkbox-row { color: #f2f4f3; }
+    body.dark-theme .primary { background: #00c853; color: #06130b; }
+    body.dark-theme .primary:disabled { background: #23292b; color: #6c7570; opacity: 1; }
+    body.dark-theme .secondary { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .secondary:disabled { opacity: 0.4; }
+    body.dark-theme .message { background: #221d0c; color: #ffc107; border-color: #4a3f14; }
+    body.dark-theme .message.success { background: #10201a; color: #9fe8c0; border-color: #1f4732; }
+    body.dark-theme .screener-progress-track { background: #1a1f1c; border-color: #2e3431; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.6); }
+    body.dark-theme .screener-progress-fill { background: repeating-linear-gradient(90deg, #00c853 0 8px, #1a1f1c 8px 10px); }
+
+    /* Tables */
+    body.dark-theme .table-wrap { border-top-color: #2e3431; }
+    body.dark-theme th { background: #1a201d; color: #e5efe9; }
+    body.dark-theme td { border-top-color: #232927; }
+    body.dark-theme td.daily-change-positive { color: #00c853; }
+    body.dark-theme td.daily-change-negative { color: #ff5252; }
+    body.dark-theme td[class*="screener-change-"],
+    body.dark-theme td[class*="screener-rvol-"],
+    body.dark-theme td[class*="screener-position-"],
+    body.dark-theme td[class*="screener-comment-"] { color: #f8fafc; font-weight: 700; }
+    body.dark-theme td.screener-change-pos-1 { background: #0b3f25; }
+    body.dark-theme td.screener-change-pos-2 { background: #075f35; }
+    body.dark-theme td.screener-change-pos-3 { background: #008a48; }
+    body.dark-theme td.screener-change-pos-4 { background: #00ad5a; }
+    body.dark-theme td.screener-change-pos-5 { background: #007a3e; }
+    body.dark-theme td.screener-change-neg-1 { background: #4a1b1f; }
+    body.dark-theme td.screener-change-neg-2 { background: #6b2228; }
+    body.dark-theme td.screener-change-neg-3 { background: #8f252c; }
+    body.dark-theme td.screener-change-neg-4 { background: #b91c1c; }
+    body.dark-theme td.screener-change-neg-5 { background: #7f1d1d; }
+    body.dark-theme td.screener-rvol-1 { background: #dbeafe; color: #1e3a5f; }
+    body.dark-theme td.screener-rvol-2 { background: #93c5fd; color: #102a43; }
+    body.dark-theme td.screener-rvol-3 { background: #2563eb; color: #ffffff; }
+    body.dark-theme td.screener-rvol-4 { background: #1d4ed8; color: #ffffff; }
+    body.dark-theme td.screener-rvol-5 { background: #1e3a8a; color: #ffffff; }
+    body.dark-theme td.screener-position-pos-1 { background: #0b3f25; }
+    body.dark-theme td.screener-position-pos-2 { background: #075f35; }
+    body.dark-theme td.screener-position-pos-3 { background: #008a48; }
+    body.dark-theme td.screener-position-pos-4 { background: #00ad5a; }
+    body.dark-theme td.screener-position-pos-5 { background: #007a3e; }
+    body.dark-theme td.screener-position-neg-1 { background: #4a1b1f; }
+    body.dark-theme td.screener-position-neg-2 { background: #6b2228; }
+    body.dark-theme td.screener-position-neg-3 { background: #8f252c; }
+    body.dark-theme td.screener-position-neg-4 { background: #b91c1c; }
+    body.dark-theme td.screener-position-neg-5 { background: #7f1d1d; }
+    body.dark-theme td.screener-bool-yes { color: #4ade80; font-weight: 800; }
+    body.dark-theme td.screener-bool-no { color: #ff5252; font-weight: 800; }
+    body.dark-theme td.screener-comment-below { background: #303746; color: #cbd5e1; }
+    body.dark-theme td.screener-comment-5d { background: #365314; }
+    body.dark-theme td.screener-comment-10d { background: #3f6212; }
+    body.dark-theme td.screener-comment-1m { background: #166534; }
+    body.dark-theme td.screener-comment-2m { background: #047857; }
+    body.dark-theme td.screener-comment-3m { background: #0f766e; }
+    body.dark-theme td.screener-comment-6m { background: #065f46; }
+    body.dark-theme td.screener-comment-1y { background: #b08900; color: #06130b; }
+    body.dark-theme td.screener-momentum-positive,
+    body.dark-theme td.screener-rsi-pos-1 { color: #4ade80; font-weight: 700; }
+    body.dark-theme td.screener-momentum-negative,
+    body.dark-theme td.screener-rsi-neg-1 { color: #ff7b7b; font-weight: 700; }
+    body.dark-theme td.screener-rsi-pos-2 { color: #22c55e; font-weight: 800; }
+    body.dark-theme td.screener-rsi-pos-3 { color: #00c853; font-weight: 900; }
+    body.dark-theme td.screener-rsi-neg-2 { color: #ff5252; font-weight: 800; }
+    body.dark-theme td.screener-rsi-neg-3 { color: #ef4444; font-weight: 900; }
+    body.dark-theme td.screener-comment-ath { color: #00c853; }
+    body.dark-theme .result-toolbar { background: #141917; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .selection-count, body.dark-theme .pagination { color: #f2f4f3; }
+    body.dark-theme .ticker-chart-link { color: #58a6ff; }
+    body.dark-theme .ticker-chart-link:hover { color: #82bfff; }
+
+    /* Screener controls row */
+    body.dark-theme .sim-controls { background: #111715; border-bottom-color: #2e3431; }
+    body.dark-theme .entry-date-text { color: #f2f4f3; }
+    body.dark-theme .sim-search input { background-color: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .sim-search input:focus { border-color: #00c853; box-shadow: 0 0 0 3px rgba(0,200,83,0.22); }
+    body.dark-theme .refine-inline-button { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-inline-count, body.dark-theme .refine-summary-count { background: #00c853; color: #06130b; }
+    body.dark-theme .selected-stock-summary { background: #1a1f1c; color: #a8b2ad; }
+    body.dark-theme .selected-stock-summary.has-selection { background: #10301f; color: #7ce3a8; }
+
+    /* Refine results */
+    body.dark-theme .refine-body { background: #111715; border-top-color: #2e3431; }
+    body.dark-theme .refine-label { color: #a8b2ad; }
+    body.dark-theme .refine-num-row input { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-string-btn { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-string-panel { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 8px 18px rgba(0,0,0,0.6); }
+    body.dark-theme .refine-string-opt { color: #f2f4f3; }
+    body.dark-theme .refine-string-clear { background: #1a1f1c; border-top-color: #2e3431; color: #a8b2ad; }
+    body.dark-theme .refine-chip { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-active-row { color: #a8b2ad; }
+    body.dark-theme .refine-link-clear { color: #58a6ff; }
+    body.dark-theme .refine-action-buttons .refine-clear-btn { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-action-buttons .refine-apply-btn { background: #00c853; color: #06130b; }
+    body.dark-theme .refine-empty-note { color: #6c7570; }
+
+    /* Watchlist */
+    body.dark-theme .watchlist-card { background: #111715; }
+    body.dark-theme .watchlist-card-title-row { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .watchlist-table th { background: #111715; color: #a8b2ad; }
+    body.dark-theme .watchlist-table td { border-top-color: #232927; }
+    body.dark-theme .watchlist-table-wrap { border-right-color: #2e3431; }
+    body.dark-theme .watchlist-ticker-btn { color: #58a6ff; }
+    body.dark-theme .watchlist-ticker-btn.active { color: #ffc107; }
+    body.dark-theme .watchlist-chart-toolbar { background: #141917; border-bottom-color: #2e3431; }
+    body.dark-theme .watchlist-forward-toggle { color: #f2f4f3; }
+    body.dark-theme .watchlist-chart-body { background: #111715; }
+    body.dark-theme .watchlist-chart-placeholder { color: #6c7570; }
+    body.dark-theme .watchlist-run-button:disabled { background: #23292b; color: #6c7570; }
+    body.dark-theme .watchlist-run-button.processing,
+    body.dark-theme .watchlist-run-button.processing:disabled { background: linear-gradient(90deg, #d4af37 0 var(--run-progress), #23292b var(--run-progress) 100%); color: #111111; cursor: wait; }
+    body.dark-theme .watchlist-run-button.report-ready { border-color: rgba(0,200,83,0.5); background: linear-gradient(135deg, #17d16b, #00c853); color: #06130b; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+
+    /* Saved reports & history */
+    body.dark-theme .saved-report-section, body.dark-theme .section { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .saved-report-section h1, body.dark-theme .section h1 { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #00c853; }
+    body.dark-theme .report-card { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+    body.dark-theme .report-card h2 { color: #f2f4f3; }
+    body.dark-theme .report-card p { color: #a8b2ad; }
+    body.dark-theme .badge.live { background: #10301f; color: #7ce3a8; border-color: #1f4732; }
+    body.dark-theme .badge.muted { background: #1a1f1c; color: #a8b2ad; border-color: #2e3431; }
+    body.dark-theme .status { color: #f2f4f3; }
+    body.dark-theme .dates { color: #a8b2ad; }
+    body.dark-theme .open { background: #00c853; color: #06130b; }
+    body.dark-theme .open.live-action { background: #1a1f1c; color: #f2f4f3; border: 1px solid #2e3431; }
+    body.dark-theme .empty { color: #6c7570; }
+    body.dark-theme .back { background: #1a1f1c; color: #f2f4f3; border: 1px solid #2e3431; }
+    body.dark-theme .history-title { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .history-grid { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .history-card { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+    body.dark-theme .history-ticker { color: #58a6ff; }
+    body.dark-theme .history-change.up { background: #00c853; color: #06130b; }
+    body.dark-theme .history-change.down { background: #ff5252; color: #16090a; }
+    body.dark-theme .history-date, body.dark-theme .history-footer { color: #a8b2ad; }
+    body.dark-theme .history-values span { background: #232927; color: #f2f4f3; }
+    body.dark-theme .history-values em { color: #a8b2ad; }
+    body.dark-theme .history-empty { background: #111715; border-color: #2e3431; color: #6c7570; }
+
+    /* Report viewer (dashboard) */
+    body.dark-theme .portfolio-subtabs-wrap { background: #0e1210; border-bottom-color: #232927; box-shadow: none; }
+    body.dark-theme .portfolio-subtabs { background: #1a1f1c; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .portfolio-subtabs button { color: #a8b2ad; }
+    body.dark-theme .portfolio-subtabs button:hover { background: #232927; color: #f2f4f3; }
+    body.dark-theme .portfolio-subtabs button.active { background: #00c853; color: #06130b; box-shadow: none; }
+    body.dark-theme img { border-color: #2e3431; }
+    body.dark-theme .replay-chart { border-color: #2e3431; }
+    /* Static report chart PNGs (Account View / All Stocks / Individual Stocks)
+       are rendered on a white canvas at report time. In dark mode, invert the
+       canvas to dark while hue-rotating so chart colors stay recognizable.
+       This also covers previously saved reports with no dark variants. */
+    body.dark-theme .fit-image,
+    body.dark-theme .single-stock-image,
+    body.dark-theme .replay-chart { filter: invert(0.92) hue-rotate(180deg); }
+    body.dark-theme .stock-button { background: #1a1f1c; color: #58a6ff; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .stock-button:hover { background: #232927; color: #82bfff; }
+    body.dark-theme .stock-button.active { background: #00c853; color: #06130b; }
+    body.dark-theme .replay-button { background: #1a1f1c; color: #f2f4f3; }
+    body.dark-theme .replay-button:hover { background: #232927; }
+    body.dark-theme .replay-button.active { background: #ff5252; color: #16090a; }
+    body.dark-theme .live-refresh-banner { background: #1a1f1c; color: #f2f4f3; box-shadow: 0 8px 18px rgba(0,0,0,0.5); }
+    body.dark-theme .live-refresh-banner strong { color: #ffc107; }
+    body.dark-theme .live-refresh-banner span { color: #a8b2ad; }
+    body.dark-theme .screener-report { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .screener-summary { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .screener-kicker { color: #ffc107; }
+    body.dark-theme .selected-ticker-list { background: rgba(255,255,255,0.07); }
+    body.dark-theme .screener-filters { background: #111715; border-bottom-color: #2e3431; }
+    body.dark-theme .screener-filter { background: #1a1f1c; border-color: #2e3431; }
+    body.dark-theme .screener-filter span { color: #a8b2ad; }
+    body.dark-theme .screener-filter strong { color: #f2f4f3; }
+    body.dark-theme .screener-table th { background: #1a201d; color: #e5efe9; }
+    body.dark-theme .screener-table td { border-top-color: #232927; }
+    body.dark-theme .screener-table td.screener-comment-ath { color: #00c853; }
+    body.dark-theme .screener-table tr.selected td:not([class*="screener-change-"]):not([class*="screener-rvol-"]):not([class*="screener-position-"]):not([class*="screener-comment-"]) { background: #10301f; }
+    body.dark-theme .screener-table tr.selected td[class*="screener-change-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-rvol-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-position-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-comment-"] { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.04); }
+    body.dark-theme .report-notes { background: #141917; border-top-color: #2e3431; }
+    body.dark-theme .report-notes h3 { color: #f2f4f3; }
+    body.dark-theme .report-notes-status { color: #a8b2ad; }
+    body.dark-theme .report-notes textarea { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .report-notes textarea:focus { border-color: #00c853; box-shadow: 0 0 0 3px rgba(0,200,83,0.18); }
+
+    /* Chart modal */
+    body.dark-theme .chart-modal { background: rgba(0,0,0,0.72); }
+    body.dark-theme .chart-modal-card { background: #111715; border-color: #2e3431; }
+    body.dark-theme .chart-modal-header { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #00c853; }
+    body.dark-theme .chart-modal-body img { background: #ffffff; border-color: #2e3431; }
+
+    /* Chart popout page */
+    body.dark-theme .top { background: #0e1210; color: #f2f4f3; }
+    body.dark-theme .tv { background: #1a1f1c; color: #f2f4f3; }
+    body.dark-theme .tv:hover { background: #232927; }
+    body.dark-theme .nav { background: rgba(255,255,255,0.06); border-color: #2e3431; color: #a8b2ad; }
+    body.dark-theme .nav:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
+    body.dark-theme .label { background: #141917; color: #a8b2ad; border-bottom-color: #2e3431; }
+    body.dark-theme .chart-shell, body.dark-theme .spinner { background: #1b202b; color: #a8b2ad; }
+    body.dark-theme .wrap .card img { background: #1b202b; }
+
+    /* Report/dashboard buttons and pills */
+    body.dark-theme .dashboard-ready { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; box-shadow: 0 5px 13px rgba(0,0,0,0.4); }
+    body.dark-theme .dashboard-ready:hover { background: #232927; }
+
+        body { margin: 0; background: #f3f3f5; color: #22262f; font-family: var(--fv-font-sans); }
+        .header { display: grid; grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr); align-items: center; gap: 16px; padding: 3px 18px; background: #353945; color: white; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid rgba(255,255,255,0.14); }
+        .brand { justify-self: start; display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .brand-logo { display: block; width: 108px; height: 52px; object-fit: contain; border: 0; border-radius: 0; background: transparent; filter: brightness(0) invert(1); }
+        .brand-text { display: block; min-width: 0; }
+        .report-title { display: block; font-size: 14px; line-height: 1.1; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+        .report-subtitle { display: block; margin-top: 3px; color: rgba(255,255,255,0.72); font-size: 12px; line-height: 1.2; white-space: nowrap; }
+        .live-clock { justify-self: end; color: #ffffff; font-size: 12px; font-weight: 600; text-align: right; white-space: nowrap; }
+        .live-clock span { display: inline-block; width: 92px; margin-top: 3px; color: rgba(255,255,255,0.68); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+        .tabs { display: inline-flex; gap: 4px; align-items: center; justify-self: center; border-radius: 999px; padding: 4px; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.20); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+        button { border: none; background: transparent; color: rgba(255,255,255,0.76); min-width: 112px; padding: 10px 22px; border-radius: 999px; cursor: pointer; font-size: 10.5px; font-weight: 500; text-align: center; white-space: nowrap; opacity: 1; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        button:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+        button.active { background: #ffffff; color: #22262f; box-shadow: 0 8px 18px rgba(0,0,0,0.22); font-weight: 600; }
+        button:focus-visible { outline: 2px solid rgba(255,255,255,0.85); outline-offset: 2px; }
+        .portfolio-subtabs-wrap { display: flex; justify-content: center; padding: 3px 8px 2px; background: #f3f3f5; border-bottom: 1px solid #dedfe5; box-shadow: inset 0 1px 0 rgba(255,255,255,0.72); }
+        .portfolio-subtabs-wrap.hidden { display: none; }
+        .portfolio-subtabs { display: inline-flex; gap: 3px; padding: 2px; border: 1px solid #c3c6d0; border-radius: 999px; background: #ffffff; box-shadow: 0 4px 12px rgba(20,22,29,0.07); }
+        .portfolio-subtabs button { min-width: 108px; padding: 6px 14px; background: transparent; color: #353945; font-size: 11.2px; font-weight: 800; box-shadow: none; }
+        .portfolio-subtabs button:hover { background: #f3f3f5; color: #22262f; }
+        .portfolio-subtabs button.active { background: #4c5263; color: #ffffff; box-shadow: 0 5px 12px rgba(34,38,47,0.18); }
+        .panel { display: none; padding: 2px 8px 6px; }
+        .panel.active { display: block; }
+        .image-wrap { display: flex; justify-content: center; align-items: flex-start; width: 100%; margin-bottom: 6px; }
+        .all-stocks-stage { position: relative; display: flex; justify-content: center; width: 100%; max-width: 100%; }
+        .replay-button { position: absolute; top: 1.1%; right: 11.8%; z-index: 3; background: #4c5263; color: #ffffff; padding: 6px 12px; font-size: 8.8px; box-shadow: 0 5px 11px rgba(34,38,47,0.18); }
+        .replay-button:hover { background: #22262f; }
+        .replay-button.active { background: #d91e2b; color: #ffffff; }
+        .replay-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+        .replay-wrap { display: none; justify-content: center; width: 100%; }
+        .replay-wrap.active { display: flex; }
+        .replay-chart { display: block; width: auto; max-width: 100%; height: calc(100vh - 86px); aspect-ratio: 20 / 9; background: #ffffff; border: 1px solid #c3c6d0; border-radius: 8px; }
+        img { background: white; border: 1px solid #c3c6d0; border-radius: 8px; }
+        .fit-image { max-width: 100%; max-height: calc(100vh - 86px); width: auto; height: auto; object-fit: contain; }
+        .fit-image.hidden { display: none; }
+        .stock-picker { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; margin: 0 auto 1px; max-width: 72%; }
+        .stock-button { min-width: auto; background: #ffffff; color: #306dca; border: 1px solid #c3c6d0; padding: 5px 10px; font-size: 9px; font-weight: 600; box-shadow: 0 2px 6px rgba(20,22,29,0.08); }
+        .stock-button:hover { background: #f3f3f5; color: #306dca; }
+        .stock-button.active { background: #4c5263; color: #ffffff; box-shadow: 0 6px 14px rgba(34,38,47,0.18); }
+        .single-stock-wrap { display: flex; justify-content: center; align-items: flex-start; width: 100%; }
+        .single-stock-image { max-width: 96%; max-height: calc(100vh - 118px); width: auto; height: auto; object-fit: contain; }
+        .live-refresh-banner { display: none; max-width: 760px; margin: 10px auto 2px; padding: 7px 14px; border-radius: 999px; background: #353945; color: #ffffff; box-shadow: 0 8px 18px rgba(20,22,29,0.18); font-size: 12px; font-weight: 700; text-align: center; }
+        .live-refresh-banner.active { display: block; }
+        .live-refresh-banner strong { display: inline-block; min-width: 18px; color: #fcdc86; font-variant-numeric: tabular-nums; }
+        .live-refresh-banner span { margin-left: 10px; color: #c3c6d0; font-variant-numeric: tabular-nums; }
+        .screener-report { width: min(1760px, calc(100vw - 56px)); max-width: none; margin: 16px auto 26px; background: #ffffff; border: 1px solid #dedfe5; border-radius: 14px; box-shadow: 0 14px 34px rgba(20,22,29,0.08); overflow: hidden; }
+        .screener-summary { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 9px 18px; background: linear-gradient(135deg, #353945, #4c5263); color: #ffffff; }
+        .screener-heading { display: block; min-width: 0; }
+        .screener-summary h2 { margin: 0; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+        .screener-summary p { margin: 3px 0 0; padding: 0; background: transparent; color: rgba(255,255,255,0.82); font-size: 11px; font-weight: 500; white-space: nowrap; }
+        .screener-kicker { color: #fcdc86; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+        .selected-ticker-list { max-width: 38%; padding: 7px 12px; border-radius: 12px; background: rgba(255,255,255,0.12); font-size: 12px; font-weight: 600; line-height: 1.25; }
+        .screener-filters { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 8px; padding: 9px 14px; background: #ffffff; border-bottom: 1px solid #dedfe5; }
+        .screener-filter { border: 1px solid #dedfe5; border-radius: 10px; padding: 6px 9px; background: #ffffff; }
+        .screener-filter span { display: block; color: #676f85; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+        .screener-filter strong { display: block; margin-top: 1px; color: #22262f; font-size: 11.5px; }
+        .screener-table-wrap { overflow-y: auto; overflow-x: hidden; max-height: calc(100vh - 260px); }
+        .screener-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.8px; }
+        .screener-table th { position: sticky; top: 0; background: #4c5263; color: #ffffff; text-align: center; vertical-align: middle; padding: 9px 6px; white-space: normal; z-index: 1; }
+        .screener-table th.sortable { cursor: pointer; user-select: none; }
+        .screener-table th.sortable .th-inner { display: inline-flex; align-items: center; justify-content: center; gap: 5px; line-height: 1; }
+        .screener-table th.sortable .sort-arrow { width: 0; height: 0; flex: none; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; border-bottom: 4.5px solid currentColor; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; }
+        .screener-table th.sortable:hover .sort-arrow { opacity: 0.4; }
+        .screener-table th.sortable.sort-asc .sort-arrow,
+        .screener-table th.sortable.sort-desc .sort-arrow { opacity: 1; }
+        .screener-table th.sortable.sort-desc .sort-arrow { transform: rotate(180deg); }
+        .screener-table th:first-child, .screener-table td:first-child { text-align: center; }
+        .screener-table td { border-top: 1px solid #dedfe5; padding: 8px 6px; text-align: center; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .screener-table th.screener-col-ticker, .screener-table td.screener-col-ticker { width: 4.5%; }
+        .screener-table th.screener-col-anchor-date, .screener-table td.screener-col-anchor-date { width: 6.8%; }
+        .screener-table th.screener-col-price, .screener-table td.screener-col-price { width: 4.8%; }
+        .screener-table th.screener-col-volume, .screener-table td.screener-col-volume { width: 5.3%; }
+        .screener-table th.screener-col-rvol, .screener-table td.screener-col-rvol { width: 4.2%; }
+        .screener-table th.screener-col-mcap, .screener-table td.screener-col-mcap { width: 5.5%; }
+        .screener-table th.screener-col-daily-change, .screener-table td.screener-col-daily-change { width: 5.3%; padding-left: 3px; padding-right: 3px; }
+        .screener-table th.screener-col-rsi14, .screener-table td.screener-col-rsi14 { width: 4.7%; }
+        .screener-table th.screener-col-daily-closing-position, .screener-table td.screener-col-daily-closing-position { width: 8.3%; padding-left: 5px; padding-right: 5px; }
+        .screener-table th.screener-col-macd, .screener-table td.screener-col-macd,
+        .screener-table th.screener-col-macd-signal, .screener-table td.screener-col-macd-signal { width: 4.7%; }
+        .screener-table th.screener-col-macd-histogram, .screener-table td.screener-col-macd-histogram { width: 5.8%; }
+        .screener-table th.screener-col-macd-gt-signal, .screener-table td.screener-col-macd-gt-signal { width: 7.2%; }
+        .screener-table th.screener-col-macd-cross, .screener-table td.screener-col-macd-cross { width: 6.8%; }
+        .screener-table th.screener-col-comment, .screener-table td.screener-col-comment { width: 7.2%; }
+        .screener-table th.screener-col-t0-t3-change, .screener-table td.screener-col-t0-t3-change { width: 8.2%; padding-left: 4px; padding-right: 4px; }
+        .screener-table th.screener-col-t0-t3-change .th-label { white-space: normal; }
+        .screener-table td[class*="screener-change-"], .screener-table td[class*="screener-rvol-"], .screener-table td[class*="screener-position-"], .screener-table td[class*="screener-comment-"] { font-weight: 700; }
+        .screener-table td.screener-change-pos-1 { background: #dcfce7; color: #166534; }
+        .screener-table td.screener-change-pos-2 { background: #86efac; color: #14532d; }
+        .screener-table td.screener-change-pos-3 { background: #22c55e; color: #052e16; }
+        .screener-table td.screener-change-pos-4 { background: #16a34a; color: #ffffff; }
+        .screener-table td.screener-change-pos-5 { background: #15803d; color: #ffffff; }
+        .screener-table td.screener-change-neg-1 { background: #fee2e2; color: #991b1b; }
+        .screener-table td.screener-change-neg-2 { background: #fecaca; color: #7f1d1d; }
+        .screener-table td.screener-change-neg-3 { background: #fca5a5; color: #7f1d1d; }
+        .screener-table td.screener-change-neg-4 { background: #ef4444; color: #ffffff; }
+        .screener-table td.screener-change-neg-5 { background: #b91c1c; color: #ffffff; }
+        .screener-table td.screener-rvol-1 { background: #dbeafe; color: #1e3a5f; }
+        .screener-table td.screener-rvol-2 { background: #bfdbfe; color: #1e3a5f; }
+        .screener-table td.screener-rvol-3 { background: #60a5fa; color: #0f172a; }
+        .screener-table td.screener-rvol-4 { background: #2563eb; color: #ffffff; }
+        .screener-table td.screener-rvol-5 { background: #1e40af; color: #ffffff; }
+        .screener-table td.screener-position-pos-1 { background: #dcfce7; color: #166534; }
+        .screener-table td.screener-position-pos-2 { background: #86efac; color: #14532d; }
+        .screener-table td.screener-position-pos-3 { background: #22c55e; color: #052e16; }
+        .screener-table td.screener-position-pos-4 { background: #16a34a; color: #ffffff; }
+        .screener-table td.screener-position-pos-5 { background: #15803d; color: #ffffff; }
+        .screener-table td.screener-position-neg-1 { background: #fee2e2; color: #991b1b; }
+        .screener-table td.screener-position-neg-2 { background: #fecaca; color: #7f1d1d; }
+        .screener-table td.screener-position-neg-3 { background: #fca5a5; color: #7f1d1d; }
+        .screener-table td.screener-position-neg-4 { background: #ef4444; color: #ffffff; }
+        .screener-table td.screener-position-neg-5 { background: #b91c1c; color: #ffffff; }
+        .screener-table td.screener-bool-yes { color: #16a34a; font-weight: 800; }
+        .screener-table td.screener-bool-no { color: #dc2626; font-weight: 800; }
+        .screener-table td.screener-comment-below { background: #e5e7eb; color: #4b5563; }
+        .screener-table td.screener-comment-5d { background: #d9f99d; color: #365314; }
+        .screener-table td.screener-comment-10d { background: #bef264; color: #365314; }
+        .screener-table td.screener-comment-1m { background: #86efac; color: #14532d; }
+        .screener-table td.screener-comment-2m { background: #34d399; color: #064e3b; }
+        .screener-table td.screener-comment-3m { background: #2dd4bf; color: #134e4a; }
+        .screener-table td.screener-comment-6m { background: #059669; color: #ffffff; }
+        .screener-table td.screener-comment-1y { background: #f3c736; color: #422006; }
+        .screener-table td.screener-momentum-positive, .screener-table td.screener-rsi-pos-1 { color: #16a34a; font-weight: 700; }
+        .screener-table td.screener-momentum-negative, .screener-table td.screener-rsi-neg-1 { color: #dc2626; font-weight: 700; }
+        .screener-table td.screener-rsi-pos-2 { color: #15803d; font-weight: 800; }
+        .screener-table td.screener-rsi-pos-3 { color: #166534; font-weight: 900; }
+        .screener-table td.screener-rsi-neg-2 { color: #b91c1c; font-weight: 800; }
+        .screener-table td.screener-rsi-neg-3 { color: #7f1d1d; font-weight: 900; }
+        .screener-table td.screener-comment-ath { color: #19803d; font-weight: 600; }
+        .screener-table tr.selected td:not([class*="screener-change-"]):not([class*="screener-rvol-"]):not([class*="screener-position-"]):not([class*="screener-comment-"]) { background: #ffffff; }
+        .screener-table tr.selected td[class*="screener-change-"], .screener-table tr.selected td[class*="screener-rvol-"], .screener-table tr.selected td[class*="screener-position-"], .screener-table tr.selected td[class*="screener-comment-"] { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.08); }
+        .report-notes { border-top: 1px solid #dedfe5; padding: 13px 18px 16px; background: #f8fafc; }
+        .report-notes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .report-notes h3 { margin: 0; color: #22262f; font-size: 13px; font-weight: 800; }
+        .report-notes-status { color: #676f85; font-size: 11px; font-weight: 700; }
+        .report-notes textarea { display: block; width: 100%; min-height: 92px; box-sizing: border-box; resize: vertical; border: 1px solid #c3c6d0; border-radius: 10px; padding: 10px 12px; background: #ffffff; color: #22262f; font: inherit; font-size: 12.5px; line-height: 1.45; }
+        .report-notes textarea:focus { border-color: #4c5263; box-shadow: 0 0 0 3px rgba(76,82,99,0.16); outline: none; }
+        .ticker-chart-link { border: none; background: transparent; color: #306dca; cursor: pointer; min-width: auto; padding: 0; font: inherit; font-weight: 600; text-decoration: none; }
+        .ticker-chart-link:hover { color: #2f91ef; text-decoration: underline; }
+        .history-panel { max-width: 1380px; margin: 16px auto 26px; }
+        .history-title { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 14px 18px; border-radius: 14px 14px 0 0; background: linear-gradient(135deg, #353945, #4c5263); color: #ffffff; }
+        .history-title h2 { margin: 0; font-size: 15px; }
+        .history-title p { margin: 0; color: rgba(255,255,255,0.76); font-size: 12px; font-weight: 600; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; padding: 14px; background: #ffffff; border: 1px solid #dedfe5; border-top: 0; border-radius: 0 0 14px 14px; box-shadow: 0 14px 34px rgba(20,22,29,0.08); }
+        .history-card { border: 1px solid #dedfe5; border-radius: 14px; background: #ffffff; padding: 13px 14px; box-shadow: 0 6px 16px rgba(20,22,29,0.06); }
+        .history-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .history-ticker { color: #306dca; font-size: 14px; }
+        .history-change { padding: 4px 10px; border-radius: 999px; color: #ffffff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .history-change.up { background: #00a449; }
+        .history-change.down { background: #d91e2b; }
+        .history-date { margin-top: 7px; color: #676f85; font-size: 11px; font-weight: 600; }
+        .history-range { position: relative; height: 12px; margin: 16px 2px 12px; border-radius: 999px; background: linear-gradient(90deg, #fbb4b4, #fdf2df 50%, #beeac1); box-shadow: inset 0 1px 2px rgba(20,22,29,0.18); }
+        .history-marker { position: absolute; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 1px 4px rgba(20,22,29,0.34); }
+        .history-marker.entry { background: #4c5263; }
+        .history-marker.last { background: #f3c736; }
+        .history-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .history-values span { display: block; padding: 7px 6px; border-radius: 10px; background: #f3f3f5; color: #22262f; font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+        .history-values em { display: block; margin-bottom: 2px; color: #676f85; font-size: 9px; font-style: normal; text-transform: uppercase; }
+        .history-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; color: #4c5263; font-size: 11px; font-weight: 600; }
+        .history-empty { max-width: 720px; margin: 24px auto; padding: 18px; border: 1px solid #dedfe5; border-radius: 14px; background: #ffffff; color: #676f85; font-size: 13px; font-weight: 600; text-align: center; }
+        .chart-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(20,22,29,0.62); z-index: 20; }
+        .chart-modal.open { display: flex; }
+        .chart-modal-card { width: min(1180px, 96vw); max-height: 92vh; overflow: auto; border-radius: 16px; background: #ffffff; box-shadow: 0 24px 70px rgba(0,0,0,0.35); border: 1px solid #c3c6d0; }
+        .chart-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #353945; color: #ffffff; font-weight: 700; }
+        .chart-modal-close { border: none; border-radius: 999px; background: rgba(255,255,255,0.12); color: #ffffff; min-width: auto; width: 32px; height: 32px; padding: 0; cursor: pointer; font-size: 18px; font-weight: 700; }
+        .chart-modal-body { padding: 14px; text-align: center; }
+        .chart-modal-body img { max-width: 100%; height: auto; border: 1px solid #dedfe5; border-radius: 10px; background: #ffffff; }
+        @media (max-width: 980px) {
+            .header { grid-template-columns: 1fr; gap: 12px; padding: 12px 16px; }
+            .tabs, .live-clock { justify-self: start; }
+            .live-clock { text-align: left; }
+            .live-clock span { text-align: left; }
+            button { font-size: 14px; padding: 10px 14px; }
+            .screener-summary { display: block; }
+            .selected-ticker-list { max-width: none; margin-top: 12px; }
+            .screener-filters { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+
+<script>
+(function () {
+    function isDarkStored() {
+        try { return localStorage.getItem('duoDarkTheme') === '1'; } catch (error) { return false; }
+    }
+    function syncToggle(dark) {
+        var toggle = document.getElementById('appThemeToggle');
+        if (toggle) { toggle.checked = dark; }
+    }
+    if (isDarkStored()) {
+        document.body.classList.add('dark-theme');
+    }
+    window.duoIsDarkTheme = function () {
+        return document.body.classList.contains('dark-theme');
+    };
+    window.duoSetDarkTheme = function (enabled) {
+        var dark = Boolean(enabled);
+        document.body.classList.toggle('dark-theme', dark);
+        try { localStorage.setItem('duoDarkTheme', dark ? '1' : '0'); } catch (error) {}
+        syncToggle(dark);
+        document.dispatchEvent(new CustomEvent('duothemechange', { detail: { dark: dark } }));
+    };
+    document.addEventListener('DOMContentLoaded', function () {
+        syncToggle(window.duoIsDarkTheme());
+    });
+})();
+</script>
+
+    <div class="header">
+        <div class="brand">
+            <img class="brand-logo" src="static/nras-logo-transparent.png" alt="NRAS Alpha">
+            <span class="brand-text">
+                <strong class="report-title">Inswing ScreenSim</strong>
+                <span class="report-subtitle">Screening and simulation review</span>
+            </span>
+        </div>
+        <div class="tabs">
+            <button type="button" onclick="goToAppRoute('/?reset=screener')">Screener</button>
+            <button class="active" type="button" data-main-tab="portfolio" onclick="showPortfolioSubTab(currentPortfolioSubTabId, document.querySelector('.portfolio-subtabs button.active') || document.querySelector('.portfolio-subtabs button'))">Portfolio</button>
+            <button type="button" onclick="showMainReportTab('history-30d', this)">30D Follow-Through</button>
+            <button type="button" onclick="goToAppRoute('/?panel=savedReports')">Saved Reports</button>
+        </div>
+        <span class="header-right">
+            <span class="live-clock" id="liveClockDate">--<span id="liveClockTime">--</span></span>
+
+<label class="theme-switch" title="Toggle dark theme">
+    <input type="checkbox" id="appThemeToggle" onchange="duoSetDarkTheme(this.checked)">
+    <span class="theme-switch-track" aria-hidden="true"></span>
+    <span>Dark</span>
+</label>
+
+        </span>
+    </div>
+    <div class="portfolio-subtabs-wrap" id="portfolioSubtabs">
+        <div class="portfolio-subtabs" aria-label="Portfolio report views">
+            <button class="active" type="button" onclick="showPortfolioSubTab('screened', this)">Selected Stocks</button>
+            <button type="button" onclick="showPortfolioSubTab('portfolio', this)">Account View</button>
+            <button type="button" onclick="showPortfolioSubTab('all-stocks', this)">All Stocks</button>
+            <button type="button" onclick="showPortfolioSubTab('individual', this)">Individual Stocks</button>
+        </div>
+    </div>
+<div class="live-refresh-banner" id="liveRefreshBanner">Live 1-min close: next update in <strong id="liveRefreshCountdown">60</strong>s<span id="liveRefreshSnapshot"></span></div>
+
+    <section id="screened" class="panel active">
+        <div class="screener-report">
+            <div class="screener-summary">
+                <div class="screener-heading">
+                    <h2>Anchor Date 11th Aug (Tue) 2026</h2>
+                    <p>6 selected from 45 scanner matches.</p>
+                </div>
+                <div class="selected-ticker-list">ACN, BX, COP, ETN, SYK, UBER</div>
+            </div>
+            <div class="screener-filters"><div class="screener-filter"><span>MCAP</span><strong>100.00B-500.00B</strong></div>
+<div class="screener-filter"><span>Volume</span><strong>&gt;= 1.00M</strong></div>
+<div class="screener-filter"><span>Price</span><strong>&gt;= 2</strong></div>
+<div class="screener-filter"><span>10D Velocity%</span><strong>&gt;= 3</strong></div>
+<div class="screener-filter"><span>RSI14</span><strong>&gt;= 45</strong></div>
+<div class="screener-filter"><span>MACD&gt;SIGNAL</span><strong>No</strong></div>
+<div class="screener-filter"><span>MACD Cross</span><strong>No</strong></div></div>
+            <div class="screener-table-wrap">
+                <table class="screener-table">
+                    <thead><tr><th class="sortable screener-col-ticker" data-sort-key="TICKER" aria-sort="none"><span class="th-inner"><span class="th-label">Ticker</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-anchor-date" data-sort-key="ANCHOR_DATE" aria-sort="none"><span class="th-inner"><span class="th-label">Anchor Date</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-price" data-sort-key="PRICE" aria-sort="none"><span class="th-inner"><span class="th-label">Price</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-volume" data-sort-key="VOLUME" aria-sort="none"><span class="th-inner"><span class="th-label">Volume</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-rvol" data-sort-key="RVOL" aria-sort="none"><span class="th-inner"><span class="th-label">Rvol</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-mcap" data-sort-key="MCAP" aria-sort="none"><span class="th-inner"><span class="th-label">Mcap</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-daily-change" data-sort-key="DAILY_CHANGE_%" aria-sort="none"><span class="th-inner"><span class="th-label">Change%</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-rsi14" data-sort-key="RSI14" aria-sort="none"><span class="th-inner"><span class="th-label">RSI14</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-daily-closing-position" data-sort-key="DAILY_CLOSING_POSITION" aria-sort="none"><span class="th-inner"><span class="th-label">Closing Position</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd" data-sort-key="MACD" aria-sort="none"><span class="th-inner"><span class="th-label">Macd</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-signal" data-sort-key="MACD_SIGNAL" aria-sort="none"><span class="th-inner"><span class="th-label">Signal</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-histogram" data-sort-key="MACD_HISTOGRAM" aria-sort="none"><span class="th-inner"><span class="th-label">Histogram</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-gt-signal" data-sort-key="MACD_GT_SIGNAL" aria-sort="none"><span class="th-inner"><span class="th-label">Macd &gt; Signal</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-cross" data-sort-key="MACD_CROSS" aria-sort="none"><span class="th-inner"><span class="th-label">MACD Cross</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-comment" data-sort-key="COMMENT" aria-sort="none"><span class="th-inner"><span class="th-label">Comment</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-t0-t3-change" data-sort-key="T0_T3_CHANGE_%" aria-sort="none"><span class="th-inner"><span class="th-label">Change % (T0-T3)</span><span class="sort-arrow" aria-hidden="true"></span></span></th></tr></thead>
+                    <tbody><tr class=" selected"><td class="screener-col-ticker" data-sort-value="ACN"><button class="ticker-chart-link" type="button" onclick="openTickerChart('ACN', '2026-08-11')">ACN</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-11">2026-08-11</td><td class="screener-col-price" data-sort-value="179.82">179.82</td><td class="screener-col-volume" data-sort-value="3900014.09761">3.90M</td><td class="screener-col-rvol" data-sort-value="0.520574422038">0.52</td><td class="screener-col-mcap" data-sort-value="110039430040">110.04B</td><td class="screener-col-daily-change screener-change-pos-1" data-sort-value="0.00880785413745">0.88%</td><td class="screener-col-rsi14 screener-rsi-pos-3" data-sort-value="70.21504876">70.22</td><td class="screener-col-daily-closing-position screener-position-pos-3" data-sort-value="Up &amp; U2-U3">Up &amp; U2-U3</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="8.29732843388">8.3</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="5.65727394337">5.66</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="2.64005449051">2.64</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-2m" data-sort-value="2M high">2M high</td><td class="screener-col-t0-t3-change screener-change-neg-2" data-sort-value="-1.62163670872">-1.62%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="BX"><button class="ticker-chart-link" type="button" onclick="openTickerChart('BX', '2026-08-11')">BX</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-11">2026-08-11</td><td class="screener-col-price" data-sort-value="147.17">147.17</td><td class="screener-col-volume" data-sort-value="7373662.0335">7.37M</td><td class="screener-col-rvol screener-rvol-1" data-sort-value="1.4093685013">1.41</td><td class="screener-col-mcap" data-sort-value="110469498027">110.47B</td><td class="screener-col-daily-change screener-change-pos-3" data-sort-value="0.0388959480446">3.89%</td><td class="screener-col-rsi14 screener-rsi-pos-3" data-sort-value="72.0888453208">72.09</td><td class="screener-col-daily-closing-position screener-position-pos-4" data-sort-value="Up &amp; U3-U4">Up &amp; U3-U4</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="4.88327902743">4.88</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="3.54397707925">3.54</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="1.33930194818">1.34</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-6m" data-sort-value="6M high">6M high</td><td class="screener-col-t0-t3-change screener-change-neg-2" data-sort-value="-1.63582455782">-1.64%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="COP"><button class="ticker-chart-link" type="button" onclick="openTickerChart('COP', '2026-08-11')">COP</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-11">2026-08-11</td><td class="screener-col-price" data-sort-value="125.92">125.92</td><td class="screener-col-volume" data-sort-value="5922811.85334">5.92M</td><td class="screener-col-rvol" data-sort-value="0.913199978592">0.91</td><td class="screener-col-mcap" data-sort-value="151272415356">151.27B</td><td class="screener-col-daily-change screener-change-pos-3" data-sort-value="0.0234902056409">2.35%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="66.9604579541">66.96</td><td class="screener-col-daily-closing-position screener-position-pos-3" data-sort-value="Up &amp; U2-U3">Up &amp; U2-U3</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="2.32090392411">2.32</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="1.74150748538">1.74</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.579396438738">0.58</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-2m" data-sort-value="2M high">2M high</td><td class="screener-col-t0-t3-change screener-change-pos-1" data-sort-value="0.415251038128">+0.42%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="ETN"><button class="ticker-chart-link" type="button" onclick="openTickerChart('ETN', '2026-08-11')">ETN</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-11">2026-08-11</td><td class="screener-col-price" data-sort-value="459.29">459.29</td><td class="screener-col-volume" data-sort-value="1840582.46363">1.84M</td><td class="screener-col-rvol" data-sort-value="0.732795603236">0.73</td><td class="screener-col-mcap" data-sort-value="178388236000">178.39B</td><td class="screener-col-daily-change screener-change-pos-3" data-sort-value="0.0322051420352">3.22%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="65.0565136639">65.06</td><td class="screener-col-daily-closing-position screener-position-pos-2" data-sort-value="Up &amp; U1-U2">Up &amp; U1-U2</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="12.3599646779">12.36</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="6.49732274216">6.5</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="5.86264193578">5.86</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-1y" data-sort-value="1Y high">1Y high</td><td class="screener-col-t0-t3-change screener-change-neg-2" data-sort-value="-1.37832596047">-1.38%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="SYK"><button class="ticker-chart-link" type="button" onclick="openTickerChart('SYK', '2026-08-11')">SYK</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-11">2026-08-11</td><td class="screener-col-price" data-sort-value="348.15">348.15</td><td class="screener-col-volume" data-sort-value="1626868.3149">1.63M</td><td class="screener-col-rvol" data-sort-value="0.66737023888">0.67</td><td class="screener-col-mcap" data-sort-value="133540955965">133.54B</td><td class="screener-col-daily-change screener-change-pos-1" data-sort-value="0.00676672161013">0.68%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="59.5598666971">59.56</td><td class="screener-col-daily-closing-position screener-position-pos-2" data-sort-value="Up &amp; U1-U2">Up &amp; U1-U2</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="6.33776882935">6.34</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="5.61394168412">5.61</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.72382714523">0.72</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-neg-3" data-sort-value="-2.36186535643">-2.36%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="UBER"><button class="ticker-chart-link" type="button" onclick="openTickerChart('UBER', '2026-08-11')">UBER</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-11">2026-08-11</td><td class="screener-col-price" data-sort-value="78.54">78.54</td><td class="screener-col-volume" data-sort-value="18711720.9178">18.71M</td><td class="screener-col-rvol" data-sort-value="0.886746307989">0.89</td><td class="screener-col-mcap" data-sort-value="160422671903">160.42B</td><td class="screener-col-daily-change screener-change-pos-1" data-sort-value="0.00653594771242">0.65%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="63.8893604023">63.89</td><td class="screener-col-daily-closing-position screener-position-pos-3" data-sort-value="Up &amp; U2-U3">Up &amp; U2-U3</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="0.807180822654">0.81</td><td class="screener-col-macd-signal screener-momentum-negative" data-sort-value="-0.140474579917">-0.14</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.94765540257">0.95</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-3m" data-sort-value="3M high">3M high</td><td class="screener-col-t0-t3-change screener-change-neg-3" data-sort-value="-3.31168004076">-3.31%</td></tr></tbody>
+                </table>
+            </div>
+            <div class="report-notes">
+                <div class="report-notes-head">
+                    <h3>Report Notes</h3>
+                    <span class="report-notes-status" id="selectedStocksNoteStatus">Autosaved in this browser</span>
+                </div>
+                <textarea id="selectedStocksNote" rows="4" placeholder="Add your notes, observations, or follow-up reminders for this saved report..."></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section id="portfolio" class="panel">
+        <div class="image-wrap"><img class="fit-image" src="meta data/2_Portfolio Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889588" alt="Portfolio performance"></div>
+    </section>
+    <section id="all-stocks" class="panel">
+        <div class="image-wrap">
+            <div class="all-stocks-stage">
+                <button class="replay-button" id="allStocksReplayButton" type="button" onclick="toggleAllStocksReplay()">&#9658; Replay</button>
+                <img class="fit-image" id="allStocksStaticImage" src="meta data/2_All Symbols Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889596" alt="All stocks performance">
+                <div class="replay-wrap" id="allStocksReplayWrap"><svg class="replay-chart" id="allStocksReplayChart" role="img" aria-label="All stocks replay chart"></svg></div>
+            </div>
+            <span class="replay-status" id="allStocksReplayStatus">10-minute bars, 1 bar every 1/3 sec</span>
+        </div>
+    </section>
+    <section id="individual" class="panel">
+        <div class="stock-picker" id="stockPicker">
+            <button class="stock-button active" type="button" onclick="showStockChart(0, this)">COP</button>
+            <button class="stock-button" type="button" onclick="showStockChart(1, this)">ETN</button>
+            <button class="stock-button" type="button" onclick="showStockChart(2, this)">ACN</button>
+            <button class="stock-button" type="button" onclick="showStockChart(3, this)">BX</button>
+            <button class="stock-button" type="button" onclick="showStockChart(4, this)">SYK</button>
+            <button class="stock-button" type="button" onclick="showStockChart(5, this)">UBER</button>
+        </div>
+        <div class="single-stock-wrap">
+            <img class="single-stock-image" id="selectedStockChart" src="meta data/2_COP Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889589" alt="Selected stock chart">
+        </div>
+    </section>
+
+    <section id="history-30d" class="panel">
+        <div class="history-panel">
+            <div class="history-title">
+                <h2>30D Follow-Through</h2>
+                <p>Daily price range from entry date through up to 30 trading days.</p>
+            </div>
+            <div class="history-grid">
+                
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('ACN', '2026-08-11')">ACN</button>
+                    <span class="history-change up">+4.60%</span>
+                </div>
+                <div class="history-date">2026-08-11 to 2026-08-27 · 13 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 46.53%"></span>
+                    <span class="history-marker last" style="left: 87.36%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$169.75</span>
+                    <span><em>Entry</em>$179.14</span>
+                    <span><em>Last</em>$187.38</span>
+                    <span><em>High</em>$189.93</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 11.26%</span>
+                    <span>Low -5.24% · High +6.02%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('BX', '2026-08-11')">BX</button>
+                    <span class="history-change down">-2.10%</span>
+                </div>
+                <div class="history-date">2026-08-11 to 2026-08-27 · 13 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 70.92%"></span>
+                    <span class="history-marker last" style="left: 45.54%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$138.12</span>
+                    <span><em>Entry</em>$146.72</span>
+                    <span><em>Last</em>$143.64</span>
+                    <span><em>High</em>$150.24</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 8.26%</span>
+                    <span>Low -5.86% · High +2.40%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('COP', '2026-08-11')">COP</button>
+                    <span class="history-change up">+2.93%</span>
+                </div>
+                <div class="history-date">2026-08-11 to 2026-08-27 · 13 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 24.50%"></span>
+                    <span class="history-marker last" style="left: 52.23%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$122.57</span>
+                    <span><em>Entry</em>$125.83</span>
+                    <span><em>Last</em>$129.52</span>
+                    <span><em>High</em>$135.88</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 10.58%</span>
+                    <span>Low -2.59% · High +7.99%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('ETN', '2026-08-11')">ETN</button>
+                    <span class="history-change down">-9.34%</span>
+                </div>
+                <div class="history-date">2026-08-11 to 2026-08-27 · 13 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 73.10%"></span>
+                    <span class="history-marker last" style="left: 12.79%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$406.95</span>
+                    <span><em>Entry</em>$458.89</span>
+                    <span><em>Last</em>$416.04</span>
+                    <span><em>High</em>$478.00</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 15.48%</span>
+                    <span>Low -11.32% · High +4.16%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('SYK', '2026-08-11')">SYK</button>
+                    <span class="history-change down">-7.44%</span>
+                </div>
+                <div class="history-date">2026-08-11 to 2026-08-27 · 13 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 93.84%"></span>
+                    <span class="history-marker last" style="left: 1.85%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$321.60</span>
+                    <span><em>Entry</em>$348.03</span>
+                    <span><em>Last</em>$322.12</span>
+                    <span><em>High</em>$349.76</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 8.09%</span>
+                    <span>Low -7.59% · High +0.50%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('UBER', '2026-08-11')">UBER</button>
+                    <span class="history-change down">-1.99%</span>
+                </div>
+                <div class="history-date">2026-08-11 to 2026-08-27 · 13 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 54.08%"></span>
+                    <span class="history-marker last" style="left: 35.50%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$73.97</span>
+                    <span><em>Entry</em>$78.51</span>
+                    <span><em>Last</em>$76.95</span>
+                    <span><em>High</em>$82.36</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 10.69%</span>
+                    <span>Low -5.78% · High +4.91%</span>
+                </div>
+            </article>
+
+            </div>
+        </div>
+    </section>
+
+    <div class="chart-modal" id="tickerChartModal" aria-hidden="true">
+        <div class="chart-modal-card" role="dialog" aria-modal="true" aria-labelledby="tickerChartTitle">
+            <div class="chart-modal-header">
+                <span id="tickerChartTitle">Daily chart</span>
+                <button class="chart-modal-close" type="button" id="tickerChartClose" aria-label="Close chart">&times;</button>
+            </div>
+            <div class="chart-modal-body">
+                <img id="tickerChartImage" alt="6 month daily chart with MACD">
+            </div>
+        </div>
+    </div>
+    <script>
+        const allStocksReplayData = {"series": [{"ticker": "COP", "color": "#3962de", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": 0.04569748266476291, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.013907929506664517, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.09338181240190485, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": -0.029802706085708064, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": -0.0973555065466629, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": -0.07748703582285, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": -0.017881623651422582, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": 0.0576185650990484, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.07351334167809194, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.07351334167809194, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": -0.6218831336552016, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": -0.11722397727046453, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": -0.0576185650990484, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": -0.07748703582285, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": -0.09338181240190485, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": -0.2125926367447484, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": 0.041723788519993546, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": -0.029802706085708064, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": -0.0011921082434341954, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": -0.17285569529713388, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": -0.21497685323160548, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": -0.1410661421390355, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": -0.16490830700760647, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": -0.2761717430609339, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": -0.17285569529713388, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": -0.1808030835866613, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": -0.06556595338856452, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": -0.037750094375235486, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": 0.04967117680952097, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": -0.06556595338856452, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": -0.02582901194095, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": 0.02582901194095, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": 0.2006715543104629, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": 0.18875047187617744, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": 0.15696091871809034, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": 0.2761717430609339, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": 0.4549879795752162, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": 0.5185670858914017, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": 0.6655937692475855, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": 0.9437523593808984, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": 0.776857205300913, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": 0.709304404839958, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": 0.7649361228666275, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": 0.832488923327571, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": 1.0192525481313695, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": 1.0510421012894677, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": 1.0550157954342259, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": 0.9755419125389969, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": 1.1940950905008823, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": 1.2020424787904098, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": 0.0973555065466629, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": 0.12119767141523388, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": -0.5702251097733017, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": -0.904015417933284, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": -0.6496989926685306, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": -0.2006715543104629, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": -0.2006715543104629, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": -0.2523295781923629, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": -0.2443821899028468, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": -0.36359301424569035, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": -0.2523295781923629, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": -0.1092765889809484, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": -0.5622777214837742, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": -0.46690906200950166, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": -0.40332995569331614, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": -0.5503566390494887, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": -0.657646380958058, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": -0.6099620512209162, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": -0.9437523593808984, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": -1.0709105720132694, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": -0.832488923327571, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": -0.832488923327571, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": -0.8483836999066146, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": -0.776857205300913, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": -0.8642784764856695, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": -0.800699370169484, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": -0.9516997476704259, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": -1.0868053485923244, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": -1.0868053485923244, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": -1.1503844549085098, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": -1.3172796089884953, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": -1.1742266197770808, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": -1.285490055830408, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": -1.2417794202380241, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": -1.1027001251713677, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": -1.0271999364208968, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": -0.8960680296437565, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": -1.035147324710413, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": -1.0470684071446985, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": -1.0073314656970838, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": 0.31988237865331776, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": 0.804673064314242, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": 0.7013570165504307, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": 1.0192525481313695, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": 0.9119628062228, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": 0.852357394051384, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": 0.9556734418151839, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": 0.6179094395104435, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": 0.5543303331942582, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": 0.3516719318114049, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": 0.47883014444378713, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": 0.657646380958058, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": 0.677514851681871, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": 0.6616200751028162, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": 0.8086467584590001, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": 0.8920943354989984, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": 0.8960680296437565, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": 0.7927519818799565, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": 0.8126204526037581, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": 0.9238838886570856, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": 0.9954103832627984, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": 1.078857960302797, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": 0.9477260535256564, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": 0.9715682183942275, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": 0.9036180485188059, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": 0.6854622399713872, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": 0.7013570165504307, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": 0.8165941467485274, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": 0.9238838886570856, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": 0.9795156066837549, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": 0.9477260535256564, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": 0.9874629949732711, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": 0.9477260535256564, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": 0.8761995589199548, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": 0.7410939579980566, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": 0.6099620512209162, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": 0.5185670858914017, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": 0.47883014444378713, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": 0.4152510381275903, "time": "2026-08-14 15:50"}]}, {"ticker": "ETN", "color": "#3fb277", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": 0.03922508662206778, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": 0.04031467236156863, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.008716685916006803, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": -0.013075028874022593, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": 0.05012094401708867, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": 0.08825644489965559, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": 0.09370437359715984, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": 0.0947939593366607, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.11331691690819994, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.08716685916015475, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": 2.536555601560284, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": 2.7043518054435762, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": 2.0811087624485194, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": 1.6594390812613065, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": 1.8893416722961964, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": 1.3598030028983001, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": 1.1091982828128817, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": 1.1538712981324535, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": 0.9849855085096731, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": 1.0220314236527268, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": 1.2748153152171595, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": 1.2464860859901126, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": 1.1593192268299577, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": 1.1091982828128817, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": 1.2639194578221384, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": 1.0547189958377894, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": 1.0830482250648363, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": 0.9065571269803221, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": 1.12990041186341, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": 0.9653729651986329, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": 0.9152520211815443, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": 0.6879208524918897, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": 0.6962452875416753, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": 0.7779642180043133, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": 0.7932184183573375, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": 0.9435812504086036, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": 1.0154939092157216, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": 0.955566693543113, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": 0.9424916646690904, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": 1.010045980518205, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": 0.9784479940726556, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": 0.9947917801651808, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": 0.8259059905424002, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": 0.7975767613153533, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": 0.7823225609623291, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": 0.5273594979188947, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": 0.42275926692671395, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": 0.31434548584628025, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": 0.2222754908583841, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": 0.9893438514676764, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": -0.20266294754734399, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": -1.0405543812242537, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": -0.8259059905423879, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": -1.0133147377367075, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": -1.163677569787961, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": -0.7082307306761969, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": -0.7943080040968384, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": -0.7975767613153409, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": -0.8803852775174801, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": -0.9828063370306591, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": -1.2530236004271178, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": -1.202902656410029, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": -1.263374664952388, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": -1.0503606528797738, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": -1.0220314236527268, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": -0.8498768768114314, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": -1.017673080694711, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": -0.7420078886007481, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": -0.77360587504631, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": -0.6940661160626735, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": -0.6488483078733387, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": -0.2582318202619369, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": -0.23099217677439088, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": -0.34321950794307754, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": -0.4630739392882826, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": -0.5017542330406, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": -0.5273594979188824, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": -0.36392163699360613, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": -0.3595632940356027, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": -0.2823334568197126, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": -0.4380134672797383, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": -0.4859552398178129, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": -0.594913813767997, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": -0.4826864825993103, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": -0.6058096711630179, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": -0.8368018479374086, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": -1.0961232539388466, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": -1.1070191113338674, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": -1.2094401708470464, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": 0.031053193575811402, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": -1.551570093050623, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": -1.2355902285950793, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": -0.9806271655516573, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": -0.7975767613153409, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": -1.1331691690819126, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": -1.6583494955218054, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": -1.2246943712000709, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": -1.388132232125347, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": -1.6539911525637898, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": -1.7507463662315572, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": -1.7564122120769687, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": -1.7193662969339027, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": -1.6997537536228753, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": -1.8354071781908547, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": -1.7782039268669982, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": -1.5646451219246456, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": -1.0917649109808432, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": -1.1778421844014846, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": -1.164767155527462, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": -1.2813528296541645, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": -1.3641613458563036, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": -1.2660986293011403, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": -1.2944278585281872, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": -1.327093638998453, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": -1.3053237159232078, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": -1.3750572032513244, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": -1.3914009893438495, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": -1.2236047854605698, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": -1.1985443134520257, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": -1.2159776852840516, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": -1.1941859704940099, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": -1.1887380417965057, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": -1.1048399398548658, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": -1.1433023164592755, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": -1.2377694000740933, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": -1.1593192268299577, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": -1.3347425308897558, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": -1.3205779162762323, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": -1.378325960469827, "time": "2026-08-14 15:50"}]}, {"ticker": "ACN", "color": "#e35151", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": 0.08931561906889864, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": 0.00558222619181608, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": 0.01674667857541651, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": 0.10048007145249907, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": 0.2428268393435315, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": 0.18700457742548174, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": 0.24143128279558143, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": 0.48007145249526273, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.3963380596181802, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.3795913810427637, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": -0.904320643072444, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": -1.9816902980908693, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": -2.5538684827509153, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": -1.8588813218711535, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": -1.7584012504186544, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": -1.9035391314056027, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": -1.405716199620397, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": -1.1108630121692424, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": -1.1443563693200753, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": -1.7584012504186544, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": -1.4792899408283897, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": -1.2839120241152076, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": -1.1555208217036916, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": -1.0689963157307092, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": -0.9573517918945937, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": -0.7201071787428782, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": -1.0103829407167433, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": -1.0438762978675762, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": -0.9489784526068934, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": -0.5414759406051127, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": -0.6642849168248285, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": -0.5861337501395462, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": -0.6196271072903792, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": -0.8205872501953773, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": -0.8038405716199608, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": -0.8540806073461945, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": -0.9057161996203942, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": -0.6559115775371123, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": -0.5526403929887131, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": -0.5247292620296962, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": -0.42704030367309725, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": -0.5414759406051127, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": -0.4772803393993468, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": -0.1328569833649657, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": -0.06698671430165018, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": -0.08925979680696286, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": 0.09489784526069885, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": 0.11443563693201547, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": 0.5414759406051286, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": 0.5582226191805292, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": 1.5351122027464554, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": 1.8756280004465857, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": 2.238472702913933, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": 3.1260466674109764, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": 3.5502958579881736, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": 2.0933348219269847, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": 0.876409512113443, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": 0.586133750139562, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": 0.6028804287149785, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": 0.06419560120576594, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": 0.3070224405492974, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": -0.32097800602879795, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": -0.09768895835658309, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": -0.44657809534441384, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": -0.6977782739756615, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": -1.0662052026348088, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": -0.7145249525510622, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": -0.5610137322764294, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": -0.4019202858099804, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": -0.29306687506976514, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": -0.2456179524394316, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": -0.3768002679468477, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": -0.31539577983699774, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": -0.27632019649434864, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": -0.2456179524394316, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": -0.18979569052136597, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": -0.5661493803728862, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": -0.5847381935915962, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": -0.3629005247292512, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": -0.6866138215920452, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": -0.3181868929328978, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": -0.2651557441107482, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": -0.1451378809869325, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": -0.07815116668526648, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": -0.2456179524394316, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": 0.23724461315173126, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": 0.5749692977559457, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": 0.3321424584124301, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": -0.3628447024673313, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": -0.3628447024673313, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": -1.7025789885006046, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": -2.78553086971083, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": -1.911912470693303, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": -1.8421346432957368, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": -1.4513788098693727, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": -1.42346767891034, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": -1.551858881321856, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": -1.6746678575415876, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": -1.5239477503628391, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": -1.2364631014848584, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": -1.0103829407167433, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": -1.4597521491570733, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": -1.0773696550184093, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": -0.5693870715641296, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": -0.8233783632912774, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": -1.0745785419225093, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": -1.4848721670202059, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": -1.7528190242268542, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": -1.5909344646645052, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": -1.4290499051021401, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": -1.4737077146365896, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": -1.6551300658702552, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": -1.5630233337054724, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": -1.2560008931561908, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": -1.42346767891034, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": -1.4513788098693727, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": -1.3118231550742405, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": -1.4388188009378067, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": -1.2113430836217414, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": -1.4360276878419063, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": -1.4262587920062402, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": -1.2950764764988238, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": -1.4792899408283897, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": -1.4597521491570733, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": -1.5713966729931885, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": -1.554649994417772, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": -1.6272189349112385, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": -1.5769788991849887, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": -1.6216367087194223, "time": "2026-08-14 15:50"}]}, {"ticker": "BX", "color": "#39a7c1", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": -0.03666973383770944, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.09883106703473417, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.05793545308932826, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": -0.06475138874688946, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": -0.040895613945405904, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": -0.05111951743176706, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": -0.0443035817741865, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": 0.23855774801485488, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.3033091367617443, "time": "2026-08-11 15:59"}, {"x": 11.6, "y": -0.6577377909552558, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": -1.0155744129775477, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": -1.2422042735916512, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": -1.209828579218216, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": -1.1144054800122625, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": -1.3222915175680725, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": -1.3359233888832143, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": -1.3529632280271366, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": -1.4279385202603678, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": -1.0871417373819983, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": -1.018982380806328, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": -0.6730736461847878, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": -0.5350509491190379, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": -0.8417680537095823, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": -1.3734110349998396, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": -0.9337831850867359, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": -0.8076883754217377, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": -0.7190812118733646, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": -0.6338820161537722, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": -0.5691306274068827, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": -0.603210305694708, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": -0.8417680537095823, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": -0.7702007293051123, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": -0.7565688579899899, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": -0.6372899839825528, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": -0.6202501448386304, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": -0.5998023378659274, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": -0.4362198820843232, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": -0.25900555498755784, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": -0.160174487952843, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": 0.05111951743174769, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": 0.0034079678287805963, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": 0.0034079678287805963, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": 0.05793545308932826, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": -0.06475138874688946, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": -0.22833384452851305, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": -0.19425416624066835, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": -0.11246293834985654, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": -0.1738063592679654, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": -0.20788603755581012, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": 0.6100262413522886, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": 0.7190812118733646, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": 0.43281191425552323, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": 1.1757489009303714, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": 1.3904508741437427, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": 1.5301775551238828, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": 1.1416692226425267, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": 0.603210305694708, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": 0.6406979518113334, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": 0.5589067239205215, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": -0.10905497052107595, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": -0.6202501448386304, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": -0.49074736734485147, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": -0.5350509491190379, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": -0.5367549330334282, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": -0.7770166649626928, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": -0.48052346385850964, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": -0.3714684933374337, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": -0.36465255767985316, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": -0.14654261663770127, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": 0.0034079678287805963, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": -0.15335855229526246, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": -0.040895613945405904, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": -0.0920151313771536, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": -0.09883106703473417, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": 0.09194697202057565, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": -0.0068159356575611925, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": -0.111713185427538, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": -0.010223903486361163, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": -0.010223903486361163, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": 0.15335855229526246, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": 0.9883106703472642, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": 1.414306648945226, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": 2.225402992195744, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": 2.12997989298981, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": 1.9800293085233283, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": 2.1367958286473714, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": 2.0141089868111535, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": 1.7891831101114406, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": 1.2166445148757772, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": 0.20107010189822955, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": -0.7736086971338928, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": -0.2658214906451384, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": -0.6509218552976945, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": -1.1144054800122625, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": -1.2166445148757772, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": -0.8417680537095823, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": -0.940599120744297, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": -1.1246293834986236, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": -0.8281361823944405, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": -0.6850015335855199, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": -0.6151381930954595, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": -0.7054493405582227, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": -0.5214190778039156, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": -0.6372218246259748, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": -0.6509218552976945, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": -0.7020413727294422, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": -0.8758477319974076, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": -0.9371911529155165, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": -1.2268684183621383, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": -1.162117029615249, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": -1.30865964625295, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": -1.0837337695532179, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": -1.387042906314962, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": -1.458610230719432, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": -1.3256994853968533, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": -1.3256994853968533, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": -1.3836349384861815, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": -1.2745799679651055, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": -1.2848038714514474, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": -1.2439082575060607, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": -1.312067614081731, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": -1.387042906314962, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": -1.230276386190919, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": -1.3529632280271366, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": -1.053062059094173, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": -1.3325154210544339, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": -1.5847050403844303, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": -1.6358245578161779, "time": "2026-08-14 15:50"}]}, {"ticker": "SYK", "color": "#cb467d", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": -0.03447978622531038, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.08332615004452594, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.16377898457029372, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": -0.15228572249517935, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": -0.258598396689934, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": -0.24423181909604516, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": -0.20975203287071845, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": -0.2054420595925567, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.014366577593888851, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.034479786225326714, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": -1.6219866103496774, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": -2.295779099502903, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": -2.1873114386690675, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": -2.275665890871465, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": -1.718242680228705, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": -1.9797143924374299, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": -1.9279947130994397, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": -2.1693532166767104, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": -1.996954285550093, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": -1.4797574921702088, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": -1.351894951584629, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": -1.219722437720871, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": -1.4194178662758952, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": -1.1866793092549481, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": -1.305921903284188, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": -1.0976065281728569, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": -0.8964744418584456, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": -1.0602534264287555, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": -0.8390081314829064, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": -0.7441887193632661, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": -0.7053989598597776, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": -0.7901617676637073, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": -0.9050943884147854, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": -0.9805189207826813, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": -0.8346981582047447, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": -0.7815418211073674, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": -0.8404447892422937, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": -0.6091428899807338, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": -0.6723558313938383, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": -0.6493693072436258, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": -0.7470620348820406, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": -0.6666092003562892, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": -0.50570353130477, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": -0.6033962589431848, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": -0.48559032267333213, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": -0.40513748814756434, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": -0.3218113381030221, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": -0.36203775536591415, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": -0.23848518805849617, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": -0.23561187253972166, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": -0.8936011263396709, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": -1.4783208344108214, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": -0.9740539608654388, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": -0.8433181047610683, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": -0.635002729649737, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": -0.7039623021003905, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": -1.2067925178863859, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": -1.719679337988092, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": -1.5185472516736973, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": -1.7527224664540315, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": -1.6938194983191053, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": -2.186593109789374, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": -1.8495531994368173, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": -1.7872022526793583, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": -1.9624744993247665, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": -2.1693532166767104, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": -2.2929057839841285, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": -2.2095796339396023, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": -2.1406200614889492, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": -2.0788437778352318, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": -2.1190414619429268, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": -2.198086371864488, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": -2.2095796339396023, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": -2.3445967301669377, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": -2.235439473608589, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": -2.2885958107059663, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": -2.1592966123609996, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": -2.0845904088727973, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": -2.1664799011579357, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": -2.154986639082838, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": -2.032870729534807, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": -1.841795247536123, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": -1.8532885096112375, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": -1.8288653277016214, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": -2.063040542481956, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": -1.9897709967531405, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": -2.004137574347029, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": -2.17797316323305, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": -1.996954285550093, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": -1.9940809700313187, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": -3.1549004396172635, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": -2.9537683533028685, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": -2.876188834295892, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": -2.942275091227754, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": -2.4782346349452635, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": -2.8101025773640127, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": -2.8136942217624807, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": -2.6003505444932777, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": -2.6333936729592176, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": -2.6146883889319863, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": -2.5256443410050755, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": -2.486854581501587, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": -2.284285837427805, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": -1.9021348734304364, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": -2.0256874407378547, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": -2.1952130563457137, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": -2.212452949458377, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": -2.2555526822400274, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": -2.1506766658046597, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": -2.2067063184208116, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": -2.3302588857282296, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": -2.3920351693819466, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": -2.3676119874723307, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": -2.3733586185098963, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": -2.551504180674079, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": -2.445191506479324, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": -2.4020917736976575, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": -2.366893658592637, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": -2.188029767548761, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": -2.3072723615780175, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": -2.2785392063902394, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": -2.370485302991122, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": -2.094647013188508, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": -2.0515472804068575, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": -2.198086371864488, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": -2.252679366721253, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": -2.3043990460592427, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": -2.4049650892164323, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": -2.361865356434782, "time": "2026-08-14 15:50"}]}, {"ticker": "UBER", "color": "#6f7782", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": -0.25474461851993735, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.43306585148389176, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.27576104954784175, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": -0.20379569481596077, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": -0.24200738759395227, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": -0.1974270793529501, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": -0.21653292574194588, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": -0.04458030824100216, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.03821169277799151, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.025474461851988303, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": -0.7769710864857973, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": -1.821424022417535, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": -2.2743599541459716, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": -1.8468984842695233, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": -1.7641064832505475, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": -1.604891096675589, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": -2.432811106865381, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": -3.209782193351178, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": -2.6875557253853004, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": -2.967774805757226, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": -2.8722455738122656, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": -3.3180486562221425, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": -3.6428480448350515, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": -3.719271430391035, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": -4.075913896318943, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": -3.846643739651013, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": -4.161890205069415, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": -4.521716978728839, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": -4.286078206597897, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": -4.279709591134886, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": -4.445293593172855, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": -4.328365813272198, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": -4.471150171952618, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": -4.600687810470015, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": -4.36250159215388, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": -4.305184052986893, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": -4.16507451280093, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": -4.082282511781936, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": -3.961278817984969, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": -4.171443128263922, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": -4.190548974652918, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": -4.196917590115911, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": -3.9230671252069778, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": -3.846643739651013, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": -4.024964972614967, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": -3.789326200484026, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": -3.630110813909067, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": -3.521844351038085, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": -4.0185963571519565, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": -3.9103298942809923, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": -4.152337281874926, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": -4.5344542096548235, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": -4.394344669468861, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": -3.884855432429004, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": -3.967647433447979, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": -4.770092981785766, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": -4.559928671506812, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": -4.776461597248758, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": -4.381607438542876, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": -4.559928671506812, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": -4.508979747802836, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": -4.572665902432815, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": -4.636352057062795, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": -4.922939752897731, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": -4.871990829193736, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": -4.884728060119739, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": -4.859253598267752, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": -4.75098713539677, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": -4.700038211692792, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": -4.547191440580827, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": -4.540822825117834, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": -4.343395745764885, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": -4.413450515857856, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": -4.298815437523882, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": -4.305184052986893, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": -4.273340975671894, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": -4.2414978983568945, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": -4.158705897337919, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": -4.139600050948924, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": -4.1268628200229385, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": -3.8084320468730213, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": -3.846643739651013, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": -3.553687428353084, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": -3.4772640427971004, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": -3.4517895809451122, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": -3.3817348108521217, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": -3.241625270666159, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": -3.1906763469621824, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": -3.37536619538913, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": -3.3498917335371416, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": -2.980257292064719, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": -2.840020379569492, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": -3.0824098840912004, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": -2.8388740287861505, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": -3.063304037702205, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": -2.9550375748312407, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": -3.1588332696471837, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": -3.3562603490001335, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": -3.5027385046490886, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": -3.52693924340849, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": -3.719271430391035, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": -3.8593809705769977, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": -3.8593809705769977, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": -3.8339065087250095, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": -3.782957585021015, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": -3.4772640427971004, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": -3.490001273723104, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": -3.31168004075915, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": -3.5027385046490886, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": -3.5027385046490886, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": -3.521844351038085, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": -3.6046363520570606, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": -3.553687428353084, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": -3.6046363520570606, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": -3.605018468984853, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": -3.483632658260093, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": -3.273468347981158, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": -3.1206215768691923, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": -2.967774805757226, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": -2.9486689593682485, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": -3.1206215768691923, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": -3.0696726531652154, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": -3.152464654184191, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": -3.2265953381734906, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": -3.2479938861291697, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": -3.3881034263151326, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": -3.31168004075915, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": -3.3307858871481453, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": -3.31168004075915, "time": "2026-08-14 15:50"}]}, {"ticker": "SPY", "color": "#111827", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": 0.007155194612857686, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.020764348794829312, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.014271431723266299, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": 0.04286623850640258, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": 0.021439612170278594, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": 0.010401653148631809, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": 0.0006622775413094366, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": 0.03377615460623503, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.045463405335021884, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.041567655092092926, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": 0.36491492525549096, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": 0.45062143060000165, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": 0.3272560062404816, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": 0.30258292136856874, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": 0.31556875551168, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": 0.35387696623384424, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": 0.35322767452668935, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": 0.33894325696926847, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": 0.2792084199109803, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": 0.26232683552494007, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": 0.26362541893924973, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": 0.2986871711256398, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": 0.2097342072453402, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": 0.27271550283941726, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": 0.2545353350390674, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": 0.2960900042970205, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": 0.3070370624796588, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": 0.30907583844013176, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": 0.3493319242837604, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": 0.36101917501256203, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": 0.3681613837912651, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": 0.38179650964153117, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": 0.3506305076980701, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": 0.3519290911123797, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": 0.3629670501340265, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": 0.354526257940999, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": 0.3558378271894633, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": 0.3662135086698006, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": 0.39737951061326177, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": 0.3921851769560231, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": 0.4356877213354259, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": 0.44867355547853716, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": 0.3882894267130794, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": 0.41036534475637304, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": 0.3993273857347262, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": 0.37790075939860224, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": 0.3662135086698006, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": 0.36491492525549096, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": 0.3181659223402993, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": 0.36361634184118136, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": 0.8272106207501545, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": 0.8791539573225846, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": 0.9791448802245164, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": 1.0479698011829868, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": 1.0986145543411074, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": 1.184321059685633, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": 1.1680887670067475, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": 0.9882349641246839, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": 0.9986236314391759, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": 0.9304480021878602, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": 0.9226565017019874, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": 0.7921488685637496, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": 0.7648786168632322, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": 0.7583727139575294, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": 0.7038451963906196, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": 0.765527908570387, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": 0.7505941993058113, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": 0.8375992880646317, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": 0.8077318695354802, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": 0.8492865387934333, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": 0.8609737895222349, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": 0.9323958773093246, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": 0.9518746285239842, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": 0.9142157095089748, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": 0.8726610402510218, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": 0.8778553739082752, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": 0.8668174148866283, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": 0.8778553739082752, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": 0.8934383748800055, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": 0.8973341251229345, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": 0.9518746285239842, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": 0.9973250480248661, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": 0.9960264646105564, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": 1.0758893445906739, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": 1.0492683845972965, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": 1.0336983694597057, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": 1.0239460080182436, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": 0.9999222148534855, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": 1.0038179650964145, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": 0.9934292977819371, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": 1.0323868002112562, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": 1.0232967163110886, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": 1.0674485523976465, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": 1.0973159709267977, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": 1.0051295343448787, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": 0.9531732119382939, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": 0.9518746285239842, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": 0.9317465856021698, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": 0.8661681231794733, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": 0.8557794558649814, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": 0.846689371964814, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": 0.8090304529497898, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": 0.778098196020905, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": 0.7557885329630498, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": 0.7986417856353126, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": 0.801238952463932, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": 0.846689371964814, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": 0.8622723729365446, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": 0.8311063709930834, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": 0.7879284724672506, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": 0.7311154480911517, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": 0.7570871163773595, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": 0.765527908570387, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": 0.7402055319913193, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": 0.7148831554122664, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": 0.7194281973623502, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": 0.7479970324771921, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": 0.7902009934422851, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": 0.7966939105138481, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": 0.7603335749131336, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": 0.7707222422276256, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": 0.8031868275853964, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": 0.7947460353923836, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": 0.7908502851494399, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": 0.769423658813316, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": 0.7902009934422851, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": 0.7921488685637496, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": 0.7960446188066933, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": 0.8090304529497898, "time": "2026-08-14 15:50"}]}, {"ticker": "QQQ", "color": "#7c3aed", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": 0.011142682043557752, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.020892528831702454, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.005571341021794711, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": 0.08774862109309646, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": 0.071034598027744, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": 0.06128475123961514, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": 0.045963563429707394, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": 0.04735639868515212, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": 0.051534904451502106, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": 0.07242743328318872, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": 0.9206780322023495, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": 1.1658031088082907, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": 0.9861273608557477, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": 1.0251267480082475, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": 0.8837539695804659, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": 1.012591230709229, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": 1.032090924285471, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": 0.9749846788121901, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": 0.8524151763329438, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": 0.8649506936319464, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": 0.8607721878656123, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": 0.8733077051646306, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": 0.7312385091091426, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": 0.7820769959329222, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": 0.7354170148754767, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": 0.864254276004224, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": 0.8336119003844243, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": 0.8691291993982964, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": 0.9109142570616697, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": 0.9464315560755417, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": 0.9791631845785242, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": 0.9889130313666372, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": 0.9554849852359483, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": 0.9916987018775424, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": 1.0070198896874503, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": 1.0007521310379333, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": 0.996573625271599, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": 0.961056326257727, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": 0.9680205025349506, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": 0.9443423031923746, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": 0.9967686222073601, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": 1.022341077497342, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": 0.9290211153824668, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": 0.9345924564042457, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": 0.9290211153824668, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": 0.8552008468438334, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": 0.805058777647776, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": 0.8496295058220386, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": 0.7939160956042024, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": 0.8357011532675915, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": 1.4318346425984696, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": 1.7591509276282793, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": 1.8956487826619886, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": 1.9053986294501015, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": 1.9666833806897326, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": 2.0892528831689785, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": 2.1505376344085936, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": 2.0363251434620318, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": 1.9764332274778456, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": 2.024486043790736, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": 2.0669675190818313, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": 1.9430051813471405, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": 1.8183464259847275, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": 1.7772577859490764, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": 1.6964733411332038, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": 1.8594350660203782, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": 1.7925789737589843, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": 1.9318624993035831, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": 1.8984344531728778, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": 1.9527550281352695, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": 1.9520586105075473, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": 2.068360354337276, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": 2.121984511671961, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": 2.101565546827118, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": 2.060003342804608, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": 2.039110813972921, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": 1.9945400857986426, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": 1.9708618864560667, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": 1.9652905454342877, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": 1.955540698646159, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": 2.0558248370382737, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": 2.1185024235333336, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": 2.135216446598686, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": 2.21042955039278, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": 2.1205916764165007, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": 2.062789013315497, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": 2.0488606607610342, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": 1.9868794918936967, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": 1.9638977101788275, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": 1.9773803554515486, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": 2.086467212658089, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": 2.147055546269982, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": 2.1017884004679814, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": 2.1282522703214624, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": 1.9255947406540659, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": 1.8803415232046317, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": 1.9207198172600093, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": 1.8538637249985994, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": 1.7605437628837242, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": 1.703437517410443, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": 1.6936876706223143, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": 1.5822747785391926, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": 1.4847484539528655, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": 1.4736197002618427, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": 1.5690289152599008, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": 1.5432614630341421, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": 1.618474566828236, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": 1.6867234943450906, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": 1.6177781492005137, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": 1.5934035322301994, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": 1.5404757925232526, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": 1.5700874700540435, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": 1.5725110033985128, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": 1.5395147361969987, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": 1.5342080338737514, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": 1.5349044515014738, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": 1.613599643434164, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": 1.6407599309153673, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": 1.6233494902222927, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": 1.562761156610384, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": 1.5940999498579216, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": 1.6324029193826832, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": 1.6337957546381436, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": 1.647724107192591, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": 1.6351885898935885, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": 1.65747395398072, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": 1.6895091648559801, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": 1.7340938213828094, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": 1.748008245584706, "time": "2026-08-14 15:50"}]}, {"ticker": "IWM", "color": "#ea580c", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-11 15:50"}, {"x": 1.0, "y": 0.013286829430315103, "time": "2026-08-11 15:51"}, {"x": 2.0, "y": -0.0033217073575787757, "time": "2026-08-11 15:52"}, {"x": 3.0, "y": -0.023251951503070314, "time": "2026-08-11 15:53"}, {"x": 4.0, "y": -0.013320046503901466, "time": "2026-08-11 15:54"}, {"x": 5.0, "y": -0.021591097824280925, "time": "2026-08-11 15:55"}, {"x": 6.0, "y": -0.021591097824280925, "time": "2026-08-11 15:56"}, {"x": 7.0, "y": -0.04152134196977246, "time": "2026-08-11 15:57"}, {"x": 8.0, "y": -0.01993024414549154, "time": "2026-08-11 15:58"}, {"x": 9.0, "y": -0.016608536787912763, "time": "2026-08-11 15:59"}, {"x": 10.0, "y": -0.03986048829098308, "time": "2026-08-11 16:00"}, {"x": 11.6, "y": 0.45507390798870767, "time": "2026-08-12 09:30"}, {"x": 12.6, "y": 0.4467696395947418, "time": "2026-08-12 09:40"}, {"x": 13.6, "y": 0.27902341803686265, "time": "2026-08-12 09:50"}, {"x": 14.6, "y": 0.26905829596412634, "time": "2026-08-12 10:00"}, {"x": 15.6, "y": 0.2606875934230066, "time": "2026-08-12 10:10"}, {"x": 16.6, "y": 0.22919780767314324, "time": "2026-08-12 10:20"}, {"x": 17.6, "y": 0.10961634280019401, "time": "2026-08-12 10:30"}, {"x": 18.6, "y": 0.11293805015777278, "time": "2026-08-12 10:40"}, {"x": 19.6, "y": 0.049825610363719394, "time": "2026-08-12 10:50"}, {"x": 20.6, "y": 0.08968609865470246, "time": "2026-08-12 11:00"}, {"x": 21.6, "y": 0.17598405580467233, "time": "2026-08-12 11:10"}, {"x": 22.6, "y": 0.2956319548247754, "time": "2026-08-12 11:20"}, {"x": 23.6, "y": 0.2358412223883008, "time": "2026-08-12 11:30"}, {"x": 24.6, "y": 0.28570004982560654, "time": "2026-08-12 11:40"}, {"x": 25.6, "y": 0.33881415047333724, "time": "2026-08-12 11:50"}, {"x": 26.6, "y": 0.4451087859159525, "time": "2026-08-12 12:00"}, {"x": 27.6, "y": 0.4750041521341992, "time": "2026-08-12 12:10"}, {"x": 28.6, "y": 0.425178541770461, "time": "2026-08-12 12:20"}, {"x": 29.6, "y": 0.45507390798870767, "time": "2026-08-12 12:30"}, {"x": 30.6, "y": 0.44843049327353124, "time": "2026-08-12 12:40"}, {"x": 31.6, "y": 0.3919614681946543, "time": "2026-08-12 12:50"}, {"x": 32.6, "y": 0.38697890715826727, "time": "2026-08-12 13:00"}, {"x": 33.6, "y": 0.3587443946188288, "time": "2026-08-12 13:10"}, {"x": 34.6, "y": 0.3952831755522331, "time": "2026-08-12 13:20"}, {"x": 35.6, "y": 0.4401262248795843, "time": "2026-08-12 13:30"}, {"x": 36.6, "y": 0.38531805347947784, "time": "2026-08-12 13:40"}, {"x": 37.6, "y": 0.41192492941371334, "time": "2026-08-12 13:50"}, {"x": 38.6, "y": 0.451752200631129, "time": "2026-08-12 14:00"}, {"x": 39.6, "y": 0.49991695731605895, "time": "2026-08-12 14:10"}, {"x": 40.6, "y": 0.5098820793887953, "time": "2026-08-12 14:20"}, {"x": 41.6, "y": 0.6228201295465868, "time": "2026-08-12 14:30"}, {"x": 42.6, "y": 0.6128550074738317, "time": "2026-08-12 14:40"}, {"x": 43.6, "y": 0.5745557216409167, "time": "2026-08-12 14:50"}, {"x": 44.6, "y": 0.7025411061285531, "time": "2026-08-12 15:00"}, {"x": 45.6, "y": 0.7540275701710618, "time": "2026-08-12 15:10"}, {"x": 46.6, "y": 0.6776283009466745, "time": "2026-08-12 15:20"}, {"x": 47.6, "y": 0.6676631788739382, "time": "2026-08-12 15:30"}, {"x": 48.6, "y": 0.6078724464374635, "time": "2026-08-12 15:40"}, {"x": 49.6, "y": 0.5514034213585677, "time": "2026-08-12 15:50"}, {"x": 50.6, "y": 0.6444112273708679, "time": "2026-08-12 16:00"}, {"x": 52.2, "y": 1.285500747384157, "time": "2026-08-13 09:30"}, {"x": 53.2, "y": 0.9799036704866263, "time": "2026-08-13 09:40"}, {"x": 54.2, "y": 1.106128550074733, "time": "2026-08-13 09:50"}, {"x": 55.2, "y": 1.1891712340142782, "time": "2026-08-13 10:00"}, {"x": 56.2, "y": 1.1260587942202245, "time": "2026-08-13 10:10"}, {"x": 57.2, "y": 1.222421524663671, "time": "2026-08-13 10:20"}, {"x": 58.2, "y": 1.0961634280019967, "time": "2026-08-13 10:30"}, {"x": 59.2, "y": 0.9832253778442052, "time": "2026-08-13 10:40"}, {"x": 60.2, "y": 0.9001826939046602, "time": "2026-08-13 10:50"}, {"x": 61.2, "y": 0.9433648895532221, "time": "2026-08-13 11:00"}, {"x": 62.2, "y": 0.8171400099651153, "time": "2026-08-13 11:10"}, {"x": 63.2, "y": 0.6610197641587806, "time": "2026-08-13 11:20"}, {"x": 64.2, "y": 0.7374190333831491, "time": "2026-08-13 11:30"}, {"x": 65.2, "y": 0.6743065935890957, "time": "2026-08-13 11:40"}, {"x": 66.2, "y": 0.6261418369041657, "time": "2026-08-13 11:50"}, {"x": 67.2, "y": 0.6643414715163594, "time": "2026-08-13 12:00"}, {"x": 68.2, "y": 0.6244809832253763, "time": "2026-08-13 12:10"}, {"x": 69.2, "y": 0.7108453745225001, "time": "2026-08-13 12:20"}, {"x": 70.2, "y": 0.6875934230194297, "time": "2026-08-13 12:30"}, {"x": 71.2, "y": 0.7158279355588681, "time": "2026-08-13 12:40"}, {"x": 72.2, "y": 0.7241322039528341, "time": "2026-08-13 12:50"}, {"x": 73.2, "y": 0.7706361069589747, "time": "2026-08-13 13:00"}, {"x": 74.2, "y": 0.7540275701710618, "time": "2026-08-13 13:10"}, {"x": 75.2, "y": 0.7008802524497637, "time": "2026-08-13 13:20"}, {"x": 76.2, "y": 0.6743065935890957, "time": "2026-08-13 13:30"}, {"x": 77.2, "y": 0.6676631788739382, "time": "2026-08-13 13:40"}, {"x": 78.2, "y": 0.7008802524497637, "time": "2026-08-13 13:50"}, {"x": 79.2, "y": 0.7042019598073425, "time": "2026-08-13 14:00"}, {"x": 80.2, "y": 0.7407407407407278, "time": "2026-08-13 14:10"}, {"x": 81.2, "y": 0.7307756186679916, "time": "2026-08-13 14:20"}, {"x": 82.2, "y": 0.7772795216741322, "time": "2026-08-13 14:30"}, {"x": 83.2, "y": 0.8104965952499577, "time": "2026-08-13 14:40"}, {"x": 84.2, "y": 0.8653047666500453, "time": "2026-08-13 14:50"}, {"x": 85.2, "y": 0.956651718983556, "time": "2026-08-13 15:00"}, {"x": 86.2, "y": 0.8985218402258709, "time": "2026-08-13 15:10"}, {"x": 87.2, "y": 0.8287659857166599, "time": "2026-08-13 15:20"}, {"x": 88.2, "y": 0.8520179372197302, "time": "2026-08-13 15:30"}, {"x": 89.2, "y": 0.8237834246802729, "time": "2026-08-13 15:40"}, {"x": 90.2, "y": 0.8104965952499577, "time": "2026-08-13 15:50"}, {"x": 91.2, "y": 0.8017937219730877, "time": "2026-08-13 16:00"}, {"x": 92.8, "y": 0.7008802524497637, "time": "2026-08-14 09:30"}, {"x": 93.8, "y": 0.9333997674804856, "time": "2026-08-14 09:40"}, {"x": 94.8, "y": 1.0330509882079433, "time": "2026-08-14 09:50"}, {"x": 95.8, "y": 1.1160936721474883, "time": "2026-08-14 10:00"}, {"x": 96.8, "y": 1.0961634280019967, "time": "2026-08-14 10:10"}, {"x": 97.8, "y": 1.1891712340142782, "time": "2026-08-14 10:20"}, {"x": 98.8, "y": 1.2290317223052611, "time": "2026-08-14 10:30"}, {"x": 99.8, "y": 1.1376847699717691, "time": "2026-08-14 10:40"}, {"x": 100.8, "y": 1.1160936721474883, "time": "2026-08-14 10:50"}, {"x": 101.8, "y": 1.162597575153629, "time": "2026-08-14 11:00"}, {"x": 102.8, "y": 1.1127719647898906, "time": "2026-08-14 11:10"}, {"x": 103.8, "y": 1.039694402923101, "time": "2026-08-14 11:20"}, {"x": 104.8, "y": 0.9998339146321179, "time": "2026-08-14 11:30"}, {"x": 105.8, "y": 0.96993854841389, "time": "2026-08-14 11:40"}, {"x": 106.8, "y": 1.0529812323534349, "time": "2026-08-14 11:50"}, {"x": 107.8, "y": 1.079554891214084, "time": "2026-08-14 12:00"}, {"x": 108.8, "y": 1.1958146487294354, "time": "2026-08-14 12:10"}, {"x": 109.8, "y": 1.1889054974256816, "time": "2026-08-14 12:20"}, {"x": 110.8, "y": 1.162597575153629, "time": "2026-08-14 12:30"}, {"x": 111.8, "y": 1.106128550074733, "time": "2026-08-14 12:40"}, {"x": 112.8, "y": 1.047998671317048, "time": "2026-08-14 12:50"}, {"x": 113.8, "y": 1.106128550074733, "time": "2026-08-14 13:00"}, {"x": 114.8, "y": 1.1875103803354885, "time": "2026-08-14 13:10"}, {"x": 115.8, "y": 1.2091014781597695, "time": "2026-08-14 13:20"}, {"x": 116.8, "y": 1.1227370868626458, "time": "2026-08-14 13:30"}, {"x": 117.8, "y": 1.0762331838565053, "time": "2026-08-14 13:40"}, {"x": 118.8, "y": 1.1227370868626458, "time": "2026-08-14 13:50"}, {"x": 119.8, "y": 1.0778940375352946, "time": "2026-08-14 14:00"}, {"x": 120.8, "y": 1.1393456236505586, "time": "2026-08-14 14:10"}, {"x": 121.8, "y": 1.1476498920445055, "time": "2026-08-14 14:20"}, {"x": 122.8, "y": 1.1509715994020844, "time": "2026-08-14 14:30"}, {"x": 123.8, "y": 1.1293805015778033, "time": "2026-08-14 14:40"}, {"x": 124.8, "y": 1.1293805015778033, "time": "2026-08-14 14:50"}, {"x": 125.8, "y": 1.149310745723295, "time": "2026-08-14 15:00"}, {"x": 126.8, "y": 1.1360239162929797, "time": "2026-08-14 15:10"}, {"x": 127.8, "y": 1.2091014781597695, "time": "2026-08-14 15:20"}, {"x": 128.8, "y": 1.285500747384157, "time": "2026-08-14 15:30"}, {"x": 129.8, "y": 1.3369872114266657, "time": "2026-08-14 15:40"}, {"x": 130.8, "y": 1.3619332336821117, "time": "2026-08-14 15:50"}]}], "frames": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.6, 12.6, 13.6, 14.6, 15.6, 16.6, 17.6, 18.6, 19.6, 20.6, 21.6, 22.6, 23.6, 24.6, 25.6, 26.6, 27.6, 28.6, 29.6, 30.6, 31.6, 32.6, 33.6, 34.6, 35.6, 36.6, 37.6, 38.6, 39.6, 40.6, 41.6, 42.6, 43.6, 44.6, 45.6, 46.6, 47.6, 48.6, 49.6, 50.6, 52.2, 53.2, 54.2, 55.2, 56.2, 57.2, 58.2, 59.2, 60.2, 61.2, 62.2, 63.2, 64.2, 65.2, 66.2, 67.2, 68.2, 69.2, 70.2, 71.2, 72.2, 73.2, 74.2, 75.2, 76.2, 77.2, 78.2, 79.2, 80.2, 81.2, 82.2, 83.2, 84.2, 85.2, 86.2, 87.2, 88.2, 89.2, 90.2, 91.2, 92.8, 93.8, 94.8, 95.8, 96.8, 97.8, 98.8, 99.8, 100.8, 101.8, 102.8, 103.8, 104.8, 105.8, 106.8, 107.8, 108.8, 109.8, 110.8, 111.8, 112.8, 113.8, 114.8, 115.8, 116.8, 117.8, 118.8, 119.8, 120.8, 121.8, 122.8, 123.8, 124.8, 125.8, 126.8, 127.8, 128.8, 129.8, 130.8], "sessions": [{"start": -0.5, "end": 10.5, "label": "Tue Aug 11 (T0)"}, {"start": 11.1, "end": 51.1, "label": "Wed Aug 12, 2026 (T1)"}, {"start": 51.7, "end": 91.7, "label": "Thu Aug 13, 2026 (T2)"}, {"start": 92.3, "end": 132.3, "label": "Fri Aug 14, 2026 (T3)"}], "xMin": -0.5, "xMax": 131.3, "yMin": -5.922939752897731, "yMax": 4.550295857988173};
+        const individualCharts = [{"ticker": "COP", "src": "meta data/2_COP Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889589"}, {"ticker": "ETN", "src": "meta data/2_ETN Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889590"}, {"ticker": "ACN", "src": "meta data/2_ACN Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889592"}, {"ticker": "BX", "src": "meta data/2_BX Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889593"}, {"ticker": "SYK", "src": "meta data/2_SYK Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889594"}, {"ticker": "UBER", "src": "meta data/2_UBER Chart 10m 11 August-14 Aug 2026 235941.png?v=1787889595"}];
+        const liveSnapshotPayload = {"entry_date": "2026-08-11", "end_date": "2026-08-14", "deployed_capital": 250000.0, "positions": {"ACN": {"entry_price": 179.14, "shares": 232.59275799188717}, "BX": {"entry_price": 146.715, "shares": 283.997319065308}, "COP": {"entry_price": 125.8275, "shares": 331.1411787301398}, "ETN": {"entry_price": 458.89, "shares": 90.79881162515345}, "SYK": {"entry_price": 348.03, "shares": 119.72147994904654}, "UBER": {"entry_price": 78.51, "shares": 530.7179552498619}}};
+        const reportNoteStorageKey = "duo-report-note:Thu 27 Aug 2026 Runs:Dashboard 11-14 Aug 2026 235941.html";
+        const reportNotePath = "Thu 27 Aug 2026 Runs/meta data/Dashboard 11-14 Aug 2026 235941 Notes.txt";
+        const portfolioSubTabIds = new Set(['screened', 'portfolio', 'all-stocks', 'individual']);
+        let currentPortfolioSubTabId = 'screened';
+        const allStocksReplayState = {
+            frameIndex: 0,
+            playing: false,
+            timer: null,
+            initialized: false
+        };
+
+        function goToAppRoute(path) {
+            const route = path || '/';
+            if (window.location.protocol === 'file:') {
+                window.location.href = `http://127.0.0.1:8765${route}`;
+                return;
+            }
+            window.location.href = route;
+        }
+        function setPortfolioSubtabsVisible(visible) {
+            const subtabs = document.getElementById('portfolioSubtabs');
+            if (subtabs) {
+                subtabs.classList.toggle('hidden', !visible);
+            }
+        }
+        function activatePanel(id) {
+            document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+            const panel = document.getElementById(id);
+            if (panel) {
+                panel.classList.add('active');
+            }
+        }
+        function showPortfolioSubTab(id, button) {
+            if (!portfolioSubTabIds.has(id)) {
+                id = 'screened';
+            }
+            currentPortfolioSubTabId = id;
+            activatePanel(id);
+            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.portfolio-subtabs button').forEach(tab => tab.classList.remove('active'));
+            const portfolioTab = document.querySelector('.tabs button[data-main-tab="portfolio"]');
+            if (portfolioTab) {
+                portfolioTab.classList.add('active');
+            }
+            if (button) {
+                button.classList.add('active');
+            }
+            setPortfolioSubtabsVisible(true);
+            window.scrollTo(0, 0);
+        }
+        function showMainReportTab(id, button) {
+            activatePanel(id);
+            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.portfolio-subtabs button').forEach(tab => tab.classList.remove('active'));
+            if (button) {
+                button.classList.add('active');
+            }
+            setPortfolioSubtabsVisible(false);
+            window.scrollTo(0, 0);
+        }
+        function showStockChart(index, button) {
+            const chart = individualCharts[index];
+            if (!chart) {
+                return;
+            }
+            const image = document.getElementById('selectedStockChart');
+            image.src = chart.src;
+            image.alt = `${chart.ticker} chart`;
+            document.querySelectorAll('.stock-picker button').forEach(tab => tab.classList.remove('active'));
+            button.classList.add('active');
+            window.scrollTo(0, 0);
+        }
+        function updateLiveClock() {
+            const now = new Date();
+            document.getElementById('liveClockDate').firstChild.nodeValue = now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
+            document.getElementById('liveClockTime').textContent = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function screenSimChartTickers() {
+            return individualCharts.map(chart => chart.ticker).filter(Boolean);
+        }
+
+        function screenSimChartPopoutUrl(ticker, anchorDate = '', forward = false) {
+            const chartBaseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765/chart-popout' : '/chart-popout';
+            const params = new URLSearchParams();
+            params.set('ticker', ticker);
+            if (anchorDate) {
+                params.set('anchor', anchorDate);
+            }
+            const tickers = screenSimChartTickers();
+            if (tickers.length) {
+                params.set('tickers', tickers.join(','));
+            }
+            if (forward) {
+                params.set('forward', '1');
+            }
+            return `${chartBaseUrl}?${params.toString()}`;
+        }
+
+        function openTickerChart(ticker, anchorDate = '') {
+            window.open(screenSimChartPopoutUrl(ticker, anchorDate), '_blank', 'width=1800,height=980,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+        }
+
+        function closeTickerChart() {
+            const modal = document.getElementById('tickerChartModal');
+            const image = document.getElementById('tickerChartImage');
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            image.removeAttribute('src');
+        }
+
+        function compareSelectedStockSortValues(aValue, bValue, direction) {
+            const aEmpty = aValue === null || aValue === undefined || String(aValue).trim() === '';
+            const bEmpty = bValue === null || bValue === undefined || String(bValue).trim() === '';
+            if (aEmpty || bEmpty) {
+                if (aEmpty && bEmpty) {
+                    return 0;
+                }
+                return aEmpty ? 1 : -1;
+            }
+            const aNumber = Number(aValue);
+            const bNumber = Number(bValue);
+            if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+                return (aNumber - bNumber) * direction;
+            }
+            return String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+        }
+
+        function sortSelectedStocksTable(header) {
+            const table = header.closest('table');
+            const tbody = table ? table.querySelector('tbody') : null;
+            if (!tbody) {
+                return;
+            }
+            const headers = [...table.querySelectorAll('th[data-sort-key]')];
+            const columnIndex = headers.indexOf(header);
+            if (columnIndex < 0) {
+                return;
+            }
+            const nextDirection = header.classList.contains('sort-asc') ? 'desc' : 'asc';
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                th.setAttribute('aria-sort', 'none');
+            });
+            header.classList.add(nextDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            header.setAttribute('aria-sort', nextDirection === 'asc' ? 'ascending' : 'descending');
+            const direction = nextDirection === 'asc' ? 1 : -1;
+            const rows = [...tbody.querySelectorAll('tr')];
+            rows.sort((a, b) => {
+                const aValue = a.children[columnIndex]?.getAttribute('data-sort-value') ?? a.children[columnIndex]?.textContent ?? '';
+                const bValue = b.children[columnIndex]?.getAttribute('data-sort-value') ?? b.children[columnIndex]?.textContent ?? '';
+                const result = compareSelectedStockSortValues(aValue, bValue, direction);
+                if (result !== 0) {
+                    return result;
+                }
+                return String(a.children[0]?.textContent || '').localeCompare(String(b.children[0]?.textContent || ''), undefined, { numeric: true, sensitivity: 'base' });
+            });
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function initSelectedStocksNotes() {
+            const note = document.getElementById('selectedStocksNote');
+            const status = document.getElementById('selectedStocksNoteStatus');
+            if (!note || !status) {
+                return;
+            }
+            const fallbackNote = window.localStorage ? (localStorage.getItem(reportNoteStorageKey) || '') : '';
+            note.value = fallbackNote;
+            const canUseServerNotes = Boolean(reportNotePath) && window.location.protocol !== 'file:';
+            if (canUseServerNotes) {
+                fetch(`/report-note?path=${encodeURIComponent(reportNotePath)}`, { cache: 'no-store' })
+                    .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('Unable to load note')))
+                    .then(data => {
+                        const serverNote = String(data.note || '');
+                        note.value = serverNote || fallbackNote;
+                        status.textContent = 'Saved to report folder';
+                        if (!serverNote && fallbackNote) {
+                            return fetch('/report-note', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: reportNotePath, note: fallbackNote })
+                            });
+                        }
+                    })
+                    .catch(() => {
+                        status.textContent = 'Autosaved in this browser';
+                    });
+            }
+            let noteSaveTimer = null;
+            note.addEventListener('input', () => {
+                status.textContent = 'Saving...';
+                if (noteSaveTimer) {
+                    clearTimeout(noteSaveTimer);
+                }
+                noteSaveTimer = setTimeout(() => {
+                    if (canUseServerNotes) {
+                        fetch('/report-note', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: reportNotePath, note: note.value })
+                        })
+                            .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('Unable to save note')))
+                            .then(() => {
+                                if (window.localStorage) {
+                                    localStorage.removeItem(reportNoteStorageKey);
+                                }
+                                status.textContent = 'Saved to report folder';
+                            })
+                            .catch(() => {
+                                if (window.localStorage) {
+                                    localStorage.setItem(reportNoteStorageKey, note.value);
+                                }
+                                status.textContent = 'Saved in this browser only';
+                            });
+                        return;
+                    }
+                    if (window.localStorage) {
+                        localStorage.setItem(reportNoteStorageKey, note.value);
+                    }
+                    status.textContent = 'Saved in this browser only';
+                }, 250);
+            });
+        }
+
+        function startLiveRefreshCountdown() {
+            const countdown = document.getElementById('liveRefreshCountdown');
+            const banner = document.getElementById('liveRefreshBanner');
+            const snapshot = document.getElementById('liveRefreshSnapshot');
+            if (!countdown || !banner || !snapshot) {
+                return;
+            }
+            function secondsUntilNextBarCheck() {
+                const now = new Date();
+                return Math.max(1, 63 - now.getSeconds());
+            }
+            let remaining = secondsUntilNextBarCheck();
+            countdown.textContent = String(remaining);
+            let refreshing = false;
+            function renderSnapshot(data) {
+                if (!data.active) {
+                    banner.classList.remove('active');
+                    return false;
+                }
+                banner.classList.add('active');
+                const pnl = Number(data.pnl_pct || 0);
+                const sign = pnl >= 0 ? '+' : '';
+                banner.firstChild.nodeValue = `Live ${data.session} 1-min close: next update in `;
+                snapshot.textContent = ` · ${data.timestamp || '--:--'} close · Portfolio ${sign}${pnl.toFixed(2)}%`;
+                return true;
+            }
+            function requestSnapshot() {
+                refreshing = true;
+                const liveSnapshotUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765/live-snapshot' : '/live-snapshot';
+                fetch(liveSnapshotUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(liveSnapshotPayload),
+                    cache: 'no-store'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Snapshot failed: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        const isActive = renderSnapshot(data);
+                        remaining = secondsUntilNextBarCheck();
+                        countdown.textContent = String(remaining);
+                        refreshing = false;
+                    })
+                    .catch(() => {
+                        banner.classList.remove('active');
+                        refreshing = false;
+                    });
+            }
+            requestSnapshot();
+            setInterval(() => {
+                if (refreshing) {
+                    return;
+                }
+                remaining -= 1;
+                if (remaining > 0) {
+                    countdown.textContent = String(remaining);
+                    return;
+                }
+                requestSnapshot();
+            }, 1000);
+        }
+
+        function svgEl(name, attrs = {}) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', name);
+            Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+            return el;
+        }
+
+        function darkenHexColor(hexColor, amount = 0.20) {
+            const raw = hexColor.replace('#', '');
+            const red = Math.round(parseInt(raw.slice(0, 2), 16) * (1 - amount));
+            const green = Math.round(parseInt(raw.slice(2, 4), 16) * (1 - amount));
+            const blue = Math.round(parseInt(raw.slice(4, 6), 16) * (1 - amount));
+            return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
+        }
+
+        function allStocksReplayScales(width, height) {
+            const margin = { left: 90, right: 330, top: 72, bottom: 108 };
+            const plotWidth = Math.max(width - margin.left - margin.right, 1);
+            const plotHeight = Math.max(height - margin.top - margin.bottom, 1);
+            const xSpan = Math.max(allStocksReplayData.xMax - allStocksReplayData.xMin, 1);
+            const ySpan = Math.max(allStocksReplayData.yMax - allStocksReplayData.yMin, 1);
+            return {
+                margin,
+                plotWidth,
+                plotHeight,
+                x: value => margin.left + ((value - allStocksReplayData.xMin) / xSpan) * plotWidth,
+                y: value => margin.top + plotHeight - ((value - allStocksReplayData.yMin) / ySpan) * plotHeight
+            };
+        }
+
+        function drawAllStocksReplayBase(svg, width, height, scales, currentMetrics) {
+            svg.innerHTML = '';
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.appendChild(svgEl('rect', { x: 0, y: 0, width, height, fill: '#ffffff', rx: 8 }));
+            svg.appendChild(svgEl('rect', { x: 0, y: scales.margin.top, width: scales.margin.left, height: scales.plotHeight, fill: '#ffffff' }));
+            svg.appendChild(svgEl('rect', { x: scales.margin.left, y: height - scales.margin.bottom, width: scales.plotWidth, height: scales.margin.bottom, fill: '#ffffff' }));
+
+            allStocksReplayData.sessions.forEach((session, idx) => {
+                const startX = scales.x(session.start);
+                const endX = scales.x(session.end);
+                svg.appendChild(svgEl('rect', { x: startX, y: 28, width: Math.max(endX - startX, 1), height: 28, fill: '#353945' }));
+                const text = svgEl('text', { x: (startX + endX) / 2, y: 47, fill: '#ffffff', 'font-size': idx === 0 ? 11 : 14, 'font-weight': 800, 'text-anchor': 'middle' });
+                text.textContent = session.label;
+                svg.appendChild(text);
+                svg.appendChild(svgEl('text', { x: startX + 4, y: 74, fill: '#353945', 'font-size': 16, 'font-weight': 800 })).textContent = '☼';
+                svg.appendChild(svgEl('circle', { cx: endX - 10, cy: 70, r: 4.4, fill: '#ffffff', stroke: '#353945', 'stroke-width': 2 }));
+                if (idx > 0) {
+                    svg.appendChild(svgEl('line', { x1: startX, x2: startX, y1: 28, y2: height - scales.margin.bottom, stroke: '#a3a8b9', 'stroke-width': 2.4, opacity: 0.95 }));
+                }
+            });
+
+            const yStep = 2;
+            const firstTick = Math.ceil(allStocksReplayData.yMin / yStep) * yStep;
+            for (let yValue = firstTick; yValue <= allStocksReplayData.yMax; yValue += yStep) {
+                const y = scales.y(yValue);
+                svg.appendChild(svgEl('line', { x1: scales.margin.left, x2: width - scales.margin.right, y1: y, y2: y, stroke: '#dedfe5', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
+                const label = svgEl('text', { x: scales.margin.left - 12, y: y + 4, fill: '#353945', 'font-size': 14, 'font-weight': 700, 'text-anchor': 'end' });
+                label.textContent = `${yValue.toFixed(0)}%`;
+                svg.appendChild(label);
+            }
+
+            const zeroY = scales.y(0);
+            svg.appendChild(svgEl('line', { x1: scales.margin.left, x2: width - scales.margin.right, y1: zeroY, y2: zeroY, stroke: '#868ea5', 'stroke-width': 1.2, 'stroke-dasharray': '5 4' }));
+            svg.appendChild(svgEl('rect', { x: scales.margin.left, y: scales.margin.top, width: scales.plotWidth, height: scales.plotHeight, fill: 'none', stroke: '#dedfe5' }));
+
+            allStocksReplayData.sessions.forEach(session => {
+                const labelTimes = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
+                const points = allStocksReplayData.series.length ? allStocksReplayData.series[0].points : [];
+                labelTimes.forEach(labelTime => {
+                    const point = points.find(item => item.time && item.time.endsWith(labelTime) && item.x >= session.start && item.x <= session.end);
+                    if (!point) {
+                        return;
+                    }
+                    const tickX = scales.x(point.x);
+                    const tick = svgEl('text', { x: tickX, y: height - 28, fill: '#353945', 'font-size': 11, 'font-weight': 700, 'text-anchor': 'end', transform: `rotate(-45 ${tickX} ${height - 28})` });
+                    tick.textContent = labelTime;
+                    svg.appendChild(tick);
+                });
+            });
+
+            const axisLabelX = 30;
+            const axisLabelY = scales.margin.top + scales.plotHeight / 2;
+            svg.appendChild(svgEl('rect', { x: axisLabelX - 10, y: axisLabelY - 92, width: 23, height: 184, rx: 4, fill: '#ffffff', stroke: '#353945', 'stroke-width': 1 }));
+            const axisText = svgEl('text', { x: axisLabelX + 6, y: axisLabelY, fill: '#353945', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle', transform: `rotate(-90 ${axisLabelX + 6} ${axisLabelY})` });
+            axisText.textContent = 'ALL STOCKS PLOTTING (%)';
+            svg.appendChild(axisText);
+
+            const tableX = width - 275;
+            const tableY = 62;
+            const tableW = 220;
+            const rowGap = 25;
+            const metrics = currentMetrics
+                .filter(metric => !metric.benchmark)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 22);
+            const tableH = Math.max(118, 58 + metrics.length * rowGap + 18);
+            const tRange = allStocksReplayData.sessions.length ? `T0 - T${allStocksReplayData.sessions.length - 1}` : 'T0';
+            const header = svgEl('text', { x: tableX + tableW / 2, y: 34, fill: '#22262f', 'font-size': 14, 'font-weight': 800, 'text-anchor': 'middle' });
+            header.textContent = `Stock Performance (${tRange})`;
+            svg.appendChild(header);
+            svg.appendChild(svgEl('rect', { x: tableX, y: tableY, width: tableW, height: tableH, rx: 4, fill: '#ffffff', stroke: '#dedfe5', 'stroke-width': 1.4 }));
+            const tableTitle = svgEl('text', { x: tableX + 46, y: tableY + 32, fill: '#22262f', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle' });
+            tableTitle.textContent = 'Ticker';
+            svg.appendChild(tableTitle);
+            const valueTitle = svgEl('text', { x: tableX + tableW - 38, y: tableY + 32, fill: '#22262f', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle' });
+            valueTitle.textContent = 'P&L (%)';
+            svg.appendChild(valueTitle);
+
+            metrics.forEach((metric, idx) => {
+                const rowY = tableY + 58 + idx * rowGap;
+                const valueColor = metric.value >= 0 ? '#00a449' : '#d91e2b';
+                svg.appendChild(svgEl('line', { x1: tableX + 10, x2: tableX + tableW - 10, y1: rowY + 9, y2: rowY + 9, stroke: '#dedfe5', 'stroke-width': 0.9 }));
+                const tickerText = svgEl('text', { x: tableX + 34, y: rowY, fill: '#22262f', 'font-size': 13, 'font-weight': 700, 'text-anchor': 'start' });
+                tickerText.textContent = metric.ticker;
+                svg.appendChild(tickerText);
+                const valueText = svgEl('text', { x: tableX + tableW - 30, y: rowY, fill: valueColor, 'font-size': 15, 'font-weight': 800, 'text-anchor': 'end' });
+                valueText.textContent = `${metric.value >= 0 ? '+' : ''}${metric.value.toFixed(2)}%`;
+                svg.appendChild(valueText);
+            });
+
+            const benchmarkMetrics = currentMetrics
+                .filter(metric => metric.benchmark)
+                .sort((a, b) => ['SPY', 'QQQ', 'IWM'].indexOf(a.ticker) - ['SPY', 'QQQ', 'IWM'].indexOf(b.ticker));
+            if (benchmarkMetrics.length) {
+                const benchY = tableY + tableH + 50;
+                const benchH = 160;
+                svg.appendChild(svgEl('rect', { x: tableX, y: benchY, width: tableW, height: benchH, rx: 4, fill: '#ffffff', stroke: '#dedfe5', 'stroke-width': 1.4 }));
+                const benchTitle = svgEl('text', { x: tableX + tableW / 2, y: benchY + 24, fill: '#22262f', 'font-size': 14, 'font-weight': 800, 'text-anchor': 'middle' });
+                benchTitle.textContent = 'Benchmark Summary';
+                svg.appendChild(benchTitle);
+                const benchSubtitle = svgEl('text', { x: tableX + tableW / 2, y: benchY + 45, fill: '#676f85', 'font-size': 11.5, 'font-weight': 800, 'text-anchor': 'middle' });
+                benchSubtitle.textContent = `Performance ${tRange}`;
+                svg.appendChild(benchSubtitle);
+                benchmarkMetrics.forEach((metric, idx) => {
+                    const rowY = benchY + 74 + idx * 34;
+                    const valueColor = metric.value >= 0 ? '#22262f' : metric.color;
+                    const nameText = svgEl('text', { x: tableX + 34, y: rowY, fill: metric.color, 'font-size': 14, 'font-weight': 800, 'text-anchor': 'start' });
+                    nameText.textContent = metric.ticker;
+                    svg.appendChild(nameText);
+                    const valueText = svgEl('text', { x: tableX + tableW - 30, y: rowY, fill: valueColor, 'font-size': 14, 'font-weight': 800, 'text-anchor': 'end' });
+                    valueText.textContent = `${metric.value >= 0 ? '+' : ''}${metric.value.toFixed(2)}%`;
+                    svg.appendChild(valueText);
+                    const lineText = svgEl('text', { x: tableX + 34, y: rowY + 15, fill: metric.color, 'font-size': 10.5, 'font-weight': 400, 'text-anchor': 'start' });
+                    lineText.textContent = `${metric.ticker} Line`;
+                    svg.appendChild(lineText);
+                    svg.appendChild(svgEl('line', { x1: tableX + tableW - 66, x2: tableX + tableW - 30, y1: rowY + 14, y2: rowY + 14, stroke: metric.color, 'stroke-width': 1.1, 'stroke-dasharray': '7 5' }));
+                });
+            }
+        }
+
+        function renderAllStocksReplayFrame() {
+            const svg = document.getElementById('allStocksReplayChart');
+            if (!svg || !allStocksReplayData.series.length || !allStocksReplayData.frames.length) {
+                return;
+            }
+            const width = 2000;
+            const height = 900;
+            const scales = allStocksReplayScales(width, height);
+            const frameX = allStocksReplayData.frames[Math.min(allStocksReplayState.frameIndex, allStocksReplayData.frames.length - 1)];
+            const currentMetrics = allStocksReplayData.series
+                .map(series => {
+                    const visiblePoints = series.points.filter(point => point.x <= frameX);
+                    if (!visiblePoints.length) {
+                        return null;
+                    }
+                    return { ticker: series.ticker, color: series.color, value: visiblePoints[visiblePoints.length - 1].y, benchmark: series.benchmark };
+                })
+                .filter(metric => metric !== null);
+            drawAllStocksReplayBase(svg, width, height, scales, currentMetrics);
+
+            const status = document.getElementById('allStocksReplayStatus');
+            let latestTime = '';
+            allStocksReplayData.series.forEach(series => {
+                const visiblePoints = series.points.filter(point => point.x <= frameX);
+                if (!visiblePoints.length) {
+                    return;
+                }
+                const pathData = visiblePoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${scales.x(point.x).toFixed(2)} ${scales.y(point.y).toFixed(2)}`).join(' ');
+                svg.appendChild(svgEl('path', {
+                    d: pathData,
+                    fill: 'none',
+                    stroke: series.color,
+                    'stroke-width': series.benchmark ? 2.4 : 1.8,
+                    'stroke-dasharray': series.benchmark ? '7 5' : 'none',
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round'
+                }));
+                const lastPoint = visiblePoints[visiblePoints.length - 1];
+                latestTime = lastPoint.time || latestTime;
+                const dotX = scales.x(lastPoint.x);
+                const dotY = scales.y(lastPoint.y);
+                svg.appendChild(svgEl('circle', { cx: dotX, cy: dotY, r: series.benchmark ? 4.8 : 4.2, fill: series.color, stroke: '#ffffff', 'stroke-width': 1.5 }));
+                const pillWidth = Math.max(series.ticker.length * 7.4 + 15, 36);
+                const pillX = Math.min(dotX + 8, width - scales.margin.right - pillWidth + 6);
+                const pillY = Math.max(scales.margin.top + 2, Math.min(dotY - 10, height - scales.margin.bottom - 20));
+                const pillColor = darkenHexColor(series.color, 0.20);
+                svg.appendChild(svgEl('rect', { x: pillX, y: pillY, width: pillWidth, height: 20, rx: 10, fill: pillColor, stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.96 }));
+                const label = svgEl('text', { x: pillX + pillWidth / 2, y: pillY + 14, fill: '#ffffff', 'font-size': 11.5, 'font-weight': 800, 'text-anchor': 'middle' });
+                label.textContent = series.ticker;
+                svg.appendChild(label);
+            });
+            status.textContent = `${allStocksReplayState.playing ? 'Playing' : 'Paused'}: ${latestTime || 'start'} (${allStocksReplayState.frameIndex + 1}/${allStocksReplayData.frames.length})`;
+        }
+
+        function setAllStocksReplayPlaying(playing) {
+            const button = document.getElementById('allStocksReplayButton');
+            allStocksReplayState.playing = playing;
+            button.innerHTML = playing ? '&#10073;&#10073; Pause' : '&#9658; Replay';
+            button.classList.toggle('active', playing);
+            if (allStocksReplayState.timer) {
+                clearInterval(allStocksReplayState.timer);
+                allStocksReplayState.timer = null;
+            }
+            if (playing) {
+                allStocksReplayState.timer = setInterval(() => {
+                    if (allStocksReplayState.frameIndex >= allStocksReplayData.frames.length - 1) {
+                        setAllStocksReplayPlaying(false);
+                        document.getElementById('allStocksReplayWrap').classList.remove('active');
+                        document.getElementById('allStocksStaticImage').classList.remove('hidden');
+                        allStocksReplayState.initialized = false;
+                        return;
+                    }
+                    allStocksReplayState.frameIndex = Math.min(allStocksReplayState.frameIndex + 1, allStocksReplayData.frames.length - 1);
+                    renderAllStocksReplayFrame();
+                }, 333);
+            }
+            renderAllStocksReplayFrame();
+        }
+
+        function toggleAllStocksReplay() {
+            if (!allStocksReplayData.series.length || !allStocksReplayData.frames.length) {
+                document.getElementById('allStocksReplayStatus').textContent = 'Replay data unavailable for this run.';
+                return;
+            }
+            document.getElementById('allStocksStaticImage').classList.add('hidden');
+            document.getElementById('allStocksReplayWrap').classList.add('active');
+            if (!allStocksReplayState.initialized || allStocksReplayState.frameIndex >= allStocksReplayData.frames.length - 1) {
+                allStocksReplayState.frameIndex = 0;
+                allStocksReplayState.initialized = true;
+            }
+            setAllStocksReplayPlaying(!allStocksReplayState.playing);
+        }
+
+        window.screenSimChartPopoutUrl = screenSimChartPopoutUrl;
+        document.querySelectorAll('.screener-table th[data-sort-key]').forEach(header => {
+            header.addEventListener('click', () => sortSelectedStocksTable(header));
+        });
+        initSelectedStocksNotes();
+        document.getElementById('tickerChartClose').addEventListener('click', closeTickerChart);
+        document.getElementById('tickerChartModal').addEventListener('click', event => {
+            if (event.target.id === 'tickerChartModal') {
+                closeTickerChart();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeTickerChart();
+            }
+        });
+        updateLiveClock();
+        setInterval(updateLiveClock, 1000);
+        startLiveRefreshCountdown();
+    </script>
+</body>
+</html>

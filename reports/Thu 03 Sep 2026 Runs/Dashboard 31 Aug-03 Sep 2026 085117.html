@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>In-Swing Report Viewer</title>
+    <style>
+
+    @font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 100 900; font-display: swap; size-adjust: 105%; src: local('IBM Plex Sans'), url('/app-static/ibm-plex-sans-latin-wght-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-style: italic; font-weight: 100 900; font-display: swap; size-adjust: 105%; src: local('IBM Plex Sans Italic'), url('/app-static/ibm-plex-sans-latin-wght-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans Fallback'; src: local('Arial'); ascent-override: 101%; descent-override: 27%; line-gap-override: 0%; size-adjust: 105%; }
+    :root {
+        color-scheme: light;
+        --fv-font-sans: 'IBM Plex Sans', 'IBM Plex Sans Fallback', Arial, sans-serif;
+        --fv-white: #ffffff;
+        --fv-gray-50: #f3f3f5; --fv-gray-100: #dedfe5; --fv-gray-200: #c3c6d0;
+        --fv-gray-300: #a3a8b9; --fv-gray-400: #868ea5; --fv-gray-500: #676f85;
+        --fv-gray-600: #4c5263; --fv-gray-700: #353945; --fv-gray-750: #2c303b;
+        --fv-gray-800: #22262f; --fv-gray-900: #14161d;
+        --fv-blue-50: #ebf4fe; --fv-blue-100: #cae2fc; --fv-blue-200: #9bcbfa;
+        --fv-blue-400: #2f91ef; --fv-blue-500: #306dca;
+        --fv-green-50: #e7f7e8; --fv-green-100: #beeac1; --fv-green-200: #86d895;
+        --fv-green-400: #00a449; --fv-green-500: #19803d;
+        --fv-red-50: #fef0f0; --fv-red-100: #fcd6d6; --fv-red-200: #fbb4b4; --fv-red-500: #d91e2b;
+        --fv-yellow-50: #fdf2df; --fv-yellow-100: #fcdc86; --fv-yellow-200: #f3c736;
+        --fv-yellow-300: #cda30b; --fv-yellow-400: #b08900; --fv-yellow-500: #8b6a00;
+    }
+    html, body, button, input, select, textarea, table, summary, details {
+        font-family: var(--fv-font-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    tbody tr:nth-child(2n) { background: #f3f3f5; }
+    tbody tr:hover { background: #e9eaee; }
+    /* Neutralise the UA's blue for checkboxes, focus rings and selection. */
+    input, select, textarea, button { accent-color: #4c5263; }
+    :focus-visible { outline: 2px solid #676f85; outline-offset: 1px; }
+    ::selection { background: #c3c6d0; color: #14161d; }
+
+    /* ------------------------------------------------------------------
+       Theme switch control (shown in page headers, works in both themes)
+       ------------------------------------------------------------------ */
+    .header-right { justify-self: end; display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
+    .theme-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: rgba(255,255,255,0.85); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+    .theme-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .theme-switch-track { position: relative; width: 30px; height: 16px; border-radius: 999px; background: rgba(255,255,255,0.25); transition: background 0.2s; }
+    .theme-switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff; transition: transform 0.2s, background 0.2s; }
+    .theme-switch input:checked + .theme-switch-track { background: #00c853; }
+    .theme-switch input:checked + .theme-switch-track::after { transform: translateX(14px); background: #06130b; }
+
+    /* ------------------------------------------------------------------
+       App dark theme (BlockTrade-inspired palette)
+       Surfaces: #080B0D / #111715 / #1A1F1C / #232927  Border: #2E3431
+       Text: #F2F4F3 / #A8B2AD  Accents: green #00C853, red #FF5252,
+       amber #FFC107, blue #2962FF
+       ------------------------------------------------------------------ */
+    /* Card/section header band: single knob used by every header rule below
+       (screener cards, watchlist, saved reports, history, chart modal). */
+    body.dark-theme { color-scheme: dark; background: #080b0d; color: #f2f4f3; --card-head-bg: radial-gradient(circle at 18% 0%, rgba(255,255,255,0.08), transparent 42%), linear-gradient(135deg, #050607 0%, #171b1f 48%, #050607 100%); --card-head-border: rgba(255,255,255,0.12); }
+    body.dark-theme tbody tr:nth-child(2n) { background: #141917; }
+    body.dark-theme tbody tr:hover { background: #1d2421; }
+    body.dark-theme input, body.dark-theme select, body.dark-theme textarea, body.dark-theme button { accent-color: #00c853; }
+    body.dark-theme :focus-visible { outline-color: #00c853; }
+    body.dark-theme ::selection { background: #00c853; color: #06130b; }
+    body.dark-theme input[type="text"], body.dark-theme input[type="date"], body.dark-theme input[type="search"], body.dark-theme select, body.dark-theme textarea { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme input::placeholder { color: #6c7570; }
+    body.dark-theme input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+    /* Header / navigation */
+    body.dark-theme .header { background: radial-gradient(circle at 14% 0%, rgba(0,200,83,0.20), transparent 34%), linear-gradient(90deg, #020a07 0%, #052214 42%, #020a07 100%); border: 0; border-bottom: 1px solid rgba(0,200,83,0.18); box-shadow: none; }
+    body.dark-theme .brand-logo { filter: brightness(0) saturate(100%) invert(77%) sepia(69%) saturate(814%) hue-rotate(359deg) brightness(101%) contrast(95%) drop-shadow(0 0 10px rgba(243,199,54,0.24)); opacity: 0.98; }
+    body.dark-theme .report-title { color: #ffffff; text-shadow: none; }
+    body.dark-theme .report-subtitle { color: #ffffff; opacity: 0.82; }
+    body.dark-theme .live-clock { color: #ffffff; }
+    body.dark-theme .live-clock span { color: #f2f4f3; }
+    body.dark-theme .theme-switch { color: #ffffff; }
+    body.dark-theme .tabs { background: rgba(0,0,0,0.26); border-color: rgba(163,230,53,0.16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(0,200,83,0.08); }
+    body.dark-theme .tabs button { color: rgba(255,255,255,0.82); }
+    body.dark-theme .tabs button:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+    body.dark-theme .tabs button.active { background: linear-gradient(135deg, #00c853, #059669); color: #06130b; box-shadow: 0 0 0 1px rgba(163,230,53,0.52), 0 0 22px rgba(0,200,83,0.42); }
+    body.dark-theme .tabs button:disabled, body.dark-theme .tabs button.disabled-tab { color: rgba(255,255,255,0.24); }
+
+    /* Cards / panels */
+    body.dark-theme .card, body.dark-theme details.card { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    /* Card headers: clearly distinct band — lighter surface, separator line and
+       a green accent edge so sections read at a glance. */
+    body.dark-theme .card h2, body.dark-theme .card-title-row, body.dark-theme details.card summary { background: var(--card-head-bg); color: #f2f4f3; border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .card-title-row h2 { background: none; border-bottom: 0; box-shadow: none; }
+    body.dark-theme label span { color: #a8b2ad; }
+    body.dark-theme .checkbox-row { color: #f2f4f3; }
+    body.dark-theme .primary { background: #00c853; color: #06130b; }
+    body.dark-theme .primary:disabled { background: #23292b; color: #6c7570; opacity: 1; }
+    body.dark-theme .secondary { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .secondary:disabled { opacity: 0.4; }
+    body.dark-theme .message { background: #221d0c; color: #ffc107; border-color: #4a3f14; }
+    body.dark-theme .message.success { background: #10201a; color: #9fe8c0; border-color: #1f4732; }
+    body.dark-theme .screener-progress-track { background: #1a1f1c; border-color: #2e3431; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.6); }
+    body.dark-theme .screener-progress-fill { background: repeating-linear-gradient(90deg, #00c853 0 8px, #1a1f1c 8px 10px); }
+
+    /* Tables */
+    body.dark-theme .table-wrap { border-top-color: #2e3431; }
+    body.dark-theme th { background: #1a201d; color: #e5efe9; }
+    body.dark-theme td { border-top-color: #232927; }
+    body.dark-theme td.daily-change-positive { color: #00c853; }
+    body.dark-theme td.daily-change-negative { color: #ff5252; }
+    body.dark-theme td[class*="screener-change-"],
+    body.dark-theme td[class*="screener-rvol-"],
+    body.dark-theme td[class*="screener-position-"],
+    body.dark-theme td[class*="screener-comment-"] { color: #f8fafc; font-weight: 700; }
+    body.dark-theme td.screener-change-pos-1 { background: #0b3f25; }
+    body.dark-theme td.screener-change-pos-2 { background: #075f35; }
+    body.dark-theme td.screener-change-pos-3 { background: #008a48; }
+    body.dark-theme td.screener-change-pos-4 { background: #00ad5a; }
+    body.dark-theme td.screener-change-pos-5 { background: #007a3e; }
+    body.dark-theme td.screener-change-neg-1 { background: #4a1b1f; }
+    body.dark-theme td.screener-change-neg-2 { background: #6b2228; }
+    body.dark-theme td.screener-change-neg-3 { background: #8f252c; }
+    body.dark-theme td.screener-change-neg-4 { background: #b91c1c; }
+    body.dark-theme td.screener-change-neg-5 { background: #7f1d1d; }
+    body.dark-theme td.screener-rvol-1 { background: #dbeafe; color: #1e3a5f; }
+    body.dark-theme td.screener-rvol-2 { background: #93c5fd; color: #102a43; }
+    body.dark-theme td.screener-rvol-3 { background: #2563eb; color: #ffffff; }
+    body.dark-theme td.screener-rvol-4 { background: #1d4ed8; color: #ffffff; }
+    body.dark-theme td.screener-rvol-5 { background: #1e3a8a; color: #ffffff; }
+    body.dark-theme td.screener-position-pos-1 { background: #0b3f25; }
+    body.dark-theme td.screener-position-pos-2 { background: #075f35; }
+    body.dark-theme td.screener-position-pos-3 { background: #008a48; }
+    body.dark-theme td.screener-position-pos-4 { background: #00ad5a; }
+    body.dark-theme td.screener-position-pos-5 { background: #007a3e; }
+    body.dark-theme td.screener-position-neg-1 { background: #4a1b1f; }
+    body.dark-theme td.screener-position-neg-2 { background: #6b2228; }
+    body.dark-theme td.screener-position-neg-3 { background: #8f252c; }
+    body.dark-theme td.screener-position-neg-4 { background: #b91c1c; }
+    body.dark-theme td.screener-position-neg-5 { background: #7f1d1d; }
+    body.dark-theme td.screener-bool-yes { color: #4ade80; font-weight: 800; }
+    body.dark-theme td.screener-bool-no { color: #ff5252; font-weight: 800; }
+    body.dark-theme td.screener-comment-below { background: #303746; color: #cbd5e1; }
+    body.dark-theme td.screener-comment-5d { background: #365314; }
+    body.dark-theme td.screener-comment-10d { background: #3f6212; }
+    body.dark-theme td.screener-comment-1m { background: #166534; }
+    body.dark-theme td.screener-comment-2m { background: #047857; }
+    body.dark-theme td.screener-comment-3m { background: #0f766e; }
+    body.dark-theme td.screener-comment-6m { background: #065f46; }
+    body.dark-theme td.screener-comment-1y { background: #b08900; color: #06130b; }
+    body.dark-theme td.screener-momentum-positive,
+    body.dark-theme td.screener-rsi-pos-1 { color: #4ade80; font-weight: 700; }
+    body.dark-theme td.screener-momentum-negative,
+    body.dark-theme td.screener-rsi-neg-1 { color: #ff7b7b; font-weight: 700; }
+    body.dark-theme td.screener-rsi-pos-2 { color: #22c55e; font-weight: 800; }
+    body.dark-theme td.screener-rsi-pos-3 { color: #00c853; font-weight: 900; }
+    body.dark-theme td.screener-rsi-neg-2 { color: #ff5252; font-weight: 800; }
+    body.dark-theme td.screener-rsi-neg-3 { color: #ef4444; font-weight: 900; }
+    body.dark-theme td.screener-comment-ath { color: #00c853; }
+    body.dark-theme .result-toolbar { background: #141917; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .selection-count, body.dark-theme .pagination { color: #f2f4f3; }
+    body.dark-theme .ticker-chart-link { color: #58a6ff; }
+    body.dark-theme .ticker-chart-link:hover { color: #82bfff; }
+
+    /* Screener controls row */
+    body.dark-theme .sim-controls { background: #111715; border-bottom-color: #2e3431; }
+    body.dark-theme .entry-date-text { color: #f2f4f3; }
+    body.dark-theme .sim-search input { background-color: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .sim-search input:focus { border-color: #00c853; box-shadow: 0 0 0 3px rgba(0,200,83,0.22); }
+    body.dark-theme .refine-inline-button { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-inline-count, body.dark-theme .refine-summary-count { background: #00c853; color: #06130b; }
+    body.dark-theme .selected-stock-summary { background: #1a1f1c; color: #a8b2ad; }
+    body.dark-theme .selected-stock-summary.has-selection { background: #10301f; color: #7ce3a8; }
+
+    /* Refine results */
+    body.dark-theme .refine-body { background: #111715; border-top-color: #2e3431; }
+    body.dark-theme .refine-label { color: #a8b2ad; }
+    body.dark-theme .refine-num-row input { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-string-btn { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-string-panel { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 8px 18px rgba(0,0,0,0.6); }
+    body.dark-theme .refine-string-opt { color: #f2f4f3; }
+    body.dark-theme .refine-string-clear { background: #1a1f1c; border-top-color: #2e3431; color: #a8b2ad; }
+    body.dark-theme .refine-chip { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-active-row { color: #a8b2ad; }
+    body.dark-theme .refine-link-clear { color: #58a6ff; }
+    body.dark-theme .refine-action-buttons .refine-clear-btn { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-action-buttons .refine-apply-btn { background: #00c853; color: #06130b; }
+    body.dark-theme .refine-empty-note { color: #6c7570; }
+
+    /* Watchlist */
+    body.dark-theme .watchlist-card { background: #111715; }
+    body.dark-theme .watchlist-card-title-row { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .watchlist-table th { background: #111715; color: #a8b2ad; }
+    body.dark-theme .watchlist-table td { border-top-color: #232927; }
+    body.dark-theme .watchlist-table-wrap { border-right-color: #2e3431; }
+    body.dark-theme .watchlist-ticker-btn { color: #58a6ff; }
+    body.dark-theme .watchlist-ticker-btn.active { color: #ffc107; }
+    body.dark-theme .watchlist-chart-toolbar { background: #141917; border-bottom-color: #2e3431; }
+    body.dark-theme .watchlist-forward-toggle { color: #f2f4f3; }
+    body.dark-theme .watchlist-chart-body { background: #111715; }
+    body.dark-theme .watchlist-chart-placeholder { color: #6c7570; }
+    body.dark-theme .watchlist-run-button:disabled { background: #23292b; color: #6c7570; }
+    body.dark-theme .watchlist-run-button.processing,
+    body.dark-theme .watchlist-run-button.processing:disabled { background: linear-gradient(90deg, #d4af37 0 var(--run-progress), #23292b var(--run-progress) 100%); color: #111111; cursor: wait; }
+    body.dark-theme .watchlist-run-button.report-ready { border-color: rgba(0,200,83,0.5); background: linear-gradient(135deg, #17d16b, #00c853); color: #06130b; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+
+    /* Saved reports & history */
+    body.dark-theme .saved-report-section, body.dark-theme .section { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .saved-report-section h1, body.dark-theme .section h1 { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #00c853; }
+    body.dark-theme .report-card { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+    body.dark-theme .report-card h2 { color: #f2f4f3; }
+    body.dark-theme .report-card p { color: #a8b2ad; }
+    body.dark-theme .badge.live { background: #10301f; color: #7ce3a8; border-color: #1f4732; }
+    body.dark-theme .badge.muted { background: #1a1f1c; color: #a8b2ad; border-color: #2e3431; }
+    body.dark-theme .status { color: #f2f4f3; }
+    body.dark-theme .dates { color: #a8b2ad; }
+    body.dark-theme .open { background: #00c853; color: #06130b; }
+    body.dark-theme .open.live-action { background: #1a1f1c; color: #f2f4f3; border: 1px solid #2e3431; }
+    body.dark-theme .empty { color: #6c7570; }
+    body.dark-theme .back { background: #1a1f1c; color: #f2f4f3; border: 1px solid #2e3431; }
+    body.dark-theme .history-title { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .history-grid { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .history-card { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+    body.dark-theme .history-ticker { color: #58a6ff; }
+    body.dark-theme .history-change.up { background: #00c853; color: #06130b; }
+    body.dark-theme .history-change.down { background: #ff5252; color: #16090a; }
+    body.dark-theme .history-date, body.dark-theme .history-footer { color: #a8b2ad; }
+    body.dark-theme .history-values span { background: #232927; color: #f2f4f3; }
+    body.dark-theme .history-values em { color: #a8b2ad; }
+    body.dark-theme .history-empty { background: #111715; border-color: #2e3431; color: #6c7570; }
+
+    /* Report viewer (dashboard) */
+    body.dark-theme .portfolio-subtabs-wrap { background: #0e1210; border-bottom-color: #232927; box-shadow: none; }
+    body.dark-theme .portfolio-subtabs { background: #1a1f1c; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .portfolio-subtabs button { color: #a8b2ad; }
+    body.dark-theme .portfolio-subtabs button:hover { background: #232927; color: #f2f4f3; }
+    body.dark-theme .portfolio-subtabs button.active { background: #00c853; color: #06130b; box-shadow: none; }
+    body.dark-theme img { border-color: #2e3431; }
+    body.dark-theme .replay-chart { border-color: #2e3431; }
+    /* Static report chart PNGs (Account View / All Stocks / Individual Stocks)
+       are rendered on a white canvas at report time. In dark mode, invert the
+       canvas to dark while hue-rotating so chart colors stay recognizable.
+       This also covers previously saved reports with no dark variants. */
+    body.dark-theme .fit-image,
+    body.dark-theme .single-stock-image,
+    body.dark-theme .replay-chart { filter: invert(0.92) hue-rotate(180deg); }
+    body.dark-theme .stock-button { background: #1a1f1c; color: #58a6ff; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .stock-button:hover { background: #232927; color: #82bfff; }
+    body.dark-theme .stock-button.active { background: #00c853; color: #06130b; }
+    body.dark-theme .replay-button { background: #1a1f1c; color: #f2f4f3; }
+    body.dark-theme .replay-button:hover { background: #232927; }
+    body.dark-theme .replay-button.active { background: #ff5252; color: #16090a; }
+    body.dark-theme .live-refresh-banner { background: #1a1f1c; color: #f2f4f3; box-shadow: 0 8px 18px rgba(0,0,0,0.5); }
+    body.dark-theme .live-refresh-banner strong { color: #ffc107; }
+    body.dark-theme .live-refresh-banner span { color: #a8b2ad; }
+    body.dark-theme .screener-report { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .screener-summary { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .screener-kicker { color: #ffc107; }
+    body.dark-theme .selected-ticker-list { background: rgba(255,255,255,0.07); }
+    body.dark-theme .screener-filters { background: #111715; border-bottom-color: #2e3431; }
+    body.dark-theme .screener-filter { background: #1a1f1c; border-color: #2e3431; }
+    body.dark-theme .screener-filter span { color: #a8b2ad; }
+    body.dark-theme .screener-filter strong { color: #f2f4f3; }
+    body.dark-theme .screener-table th { background: #1a201d; color: #e5efe9; }
+    body.dark-theme .screener-table td { border-top-color: #232927; }
+    body.dark-theme .screener-table td.screener-comment-ath { color: #00c853; }
+    body.dark-theme .screener-table tr.selected td:not([class*="screener-change-"]):not([class*="screener-rvol-"]):not([class*="screener-position-"]):not([class*="screener-comment-"]) { background: #10301f; }
+    body.dark-theme .screener-table tr.selected td[class*="screener-change-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-rvol-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-position-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-comment-"] { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.04); }
+    body.dark-theme .report-notes { background: #141917; border-top-color: #2e3431; }
+    body.dark-theme .report-notes h3 { color: #f2f4f3; }
+    body.dark-theme .report-notes-status { color: #a8b2ad; }
+    body.dark-theme .report-notes textarea { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .report-notes textarea:focus { border-color: #00c853; box-shadow: 0 0 0 3px rgba(0,200,83,0.18); }
+
+    /* Chart modal */
+    body.dark-theme .chart-modal { background: rgba(0,0,0,0.72); }
+    body.dark-theme .chart-modal-card { background: #111715; border-color: #2e3431; }
+    body.dark-theme .chart-modal-header { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #00c853; }
+    body.dark-theme .chart-modal-body img { background: #ffffff; border-color: #2e3431; }
+
+    /* Chart popout page */
+    body.dark-theme .top { background: #0e1210; color: #f2f4f3; }
+    body.dark-theme .tv { background: #1a1f1c; color: #f2f4f3; }
+    body.dark-theme .tv:hover { background: #232927; }
+    body.dark-theme .nav { background: rgba(255,255,255,0.06); border-color: #2e3431; color: #a8b2ad; }
+    body.dark-theme .nav:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
+    body.dark-theme .label { background: #141917; color: #a8b2ad; border-bottom-color: #2e3431; }
+    body.dark-theme .chart-shell, body.dark-theme .spinner { background: #1b202b; color: #a8b2ad; }
+    body.dark-theme .wrap .card img { background: #1b202b; }
+
+    /* Report/dashboard buttons and pills */
+    body.dark-theme .dashboard-ready { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; box-shadow: 0 5px 13px rgba(0,0,0,0.4); }
+    body.dark-theme .dashboard-ready:hover { background: #232927; }
+
+        body { margin: 0; background: #f3f3f5; color: #22262f; font-family: var(--fv-font-sans); }
+        .header { display: grid; grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr); align-items: center; gap: 16px; padding: 3px 18px; background: #353945; color: white; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid rgba(255,255,255,0.14); }
+        .brand { justify-self: start; display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .brand-logo { display: block; width: 108px; height: 52px; object-fit: contain; border: 0; border-radius: 0; background: transparent; filter: brightness(0) invert(1); }
+        .brand-text { display: block; min-width: 0; }
+        .report-title { display: block; font-size: 14px; line-height: 1.1; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+        .report-subtitle { display: block; margin-top: 3px; color: rgba(255,255,255,0.72); font-size: 12px; line-height: 1.2; white-space: nowrap; }
+        .live-clock { justify-self: end; color: #ffffff; font-size: 12px; font-weight: 600; text-align: right; white-space: nowrap; }
+        .live-clock span { display: inline-block; width: 92px; margin-top: 3px; color: rgba(255,255,255,0.68); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+        .tabs { display: inline-flex; gap: 4px; align-items: center; justify-self: center; border-radius: 999px; padding: 4px; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.20); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+        button { border: none; background: transparent; color: rgba(255,255,255,0.76); min-width: 112px; padding: 10px 22px; border-radius: 999px; cursor: pointer; font-size: 10.5px; font-weight: 500; text-align: center; white-space: nowrap; opacity: 1; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        button:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+        button.active { background: #ffffff; color: #22262f; box-shadow: 0 8px 18px rgba(0,0,0,0.22); font-weight: 600; }
+        button:focus-visible { outline: 2px solid rgba(255,255,255,0.85); outline-offset: 2px; }
+        .portfolio-subtabs-wrap { display: flex; justify-content: center; padding: 3px 8px 2px; background: #f3f3f5; border-bottom: 1px solid #dedfe5; box-shadow: inset 0 1px 0 rgba(255,255,255,0.72); }
+        .portfolio-subtabs-wrap.hidden { display: none; }
+        .portfolio-subtabs { display: inline-flex; gap: 3px; padding: 2px; border: 1px solid #c3c6d0; border-radius: 999px; background: #ffffff; box-shadow: 0 4px 12px rgba(20,22,29,0.07); }
+        .portfolio-subtabs button { min-width: 108px; padding: 6px 14px; background: transparent; color: #353945; font-size: 11.2px; font-weight: 800; box-shadow: none; }
+        .portfolio-subtabs button:hover { background: #f3f3f5; color: #22262f; }
+        .portfolio-subtabs button.active { background: #4c5263; color: #ffffff; box-shadow: 0 5px 12px rgba(34,38,47,0.18); }
+        .panel { display: none; padding: 2px 8px 6px; }
+        .panel.active { display: block; }
+        .image-wrap { display: flex; justify-content: center; align-items: flex-start; width: 100%; margin-bottom: 6px; }
+        .all-stocks-stage { position: relative; display: flex; justify-content: center; width: 100%; max-width: 100%; }
+        .replay-button { position: absolute; top: 1.1%; right: 11.8%; z-index: 3; background: #4c5263; color: #ffffff; padding: 6px 12px; font-size: 8.8px; box-shadow: 0 5px 11px rgba(34,38,47,0.18); }
+        .replay-button:hover { background: #22262f; }
+        .replay-button.active { background: #d91e2b; color: #ffffff; }
+        .replay-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+        .replay-wrap { display: none; justify-content: center; width: 100%; }
+        .replay-wrap.active { display: flex; }
+        .replay-chart { display: block; width: auto; max-width: 100%; height: calc(100vh - 86px); aspect-ratio: 20 / 9; background: #ffffff; border: 1px solid #c3c6d0; border-radius: 8px; }
+        img { background: white; border: 1px solid #c3c6d0; border-radius: 8px; }
+        .fit-image { max-width: 100%; max-height: calc(100vh - 86px); width: auto; height: auto; object-fit: contain; }
+        .fit-image.hidden { display: none; }
+        .stock-picker { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; margin: 0 auto 1px; max-width: 72%; }
+        .stock-button { min-width: auto; background: #ffffff; color: #306dca; border: 1px solid #c3c6d0; padding: 5px 10px; font-size: 9px; font-weight: 600; box-shadow: 0 2px 6px rgba(20,22,29,0.08); }
+        .stock-button:hover { background: #f3f3f5; color: #306dca; }
+        .stock-button.active { background: #4c5263; color: #ffffff; box-shadow: 0 6px 14px rgba(34,38,47,0.18); }
+        .single-stock-wrap { display: flex; justify-content: center; align-items: flex-start; width: 100%; }
+        .single-stock-image { max-width: 96%; max-height: calc(100vh - 118px); width: auto; height: auto; object-fit: contain; }
+        .live-refresh-banner { display: none; max-width: 760px; margin: 10px auto 2px; padding: 7px 14px; border-radius: 999px; background: #353945; color: #ffffff; box-shadow: 0 8px 18px rgba(20,22,29,0.18); font-size: 12px; font-weight: 700; text-align: center; }
+        .live-refresh-banner.active { display: block; }
+        .live-refresh-banner strong { display: inline-block; min-width: 18px; color: #fcdc86; font-variant-numeric: tabular-nums; }
+        .live-refresh-banner span { margin-left: 10px; color: #c3c6d0; font-variant-numeric: tabular-nums; }
+        .screener-report { width: min(1760px, calc(100vw - 56px)); max-width: none; margin: 16px auto 26px; background: #ffffff; border: 1px solid #dedfe5; border-radius: 14px; box-shadow: 0 14px 34px rgba(20,22,29,0.08); overflow: hidden; }
+        .screener-summary { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 9px 18px; background: linear-gradient(135deg, #353945, #4c5263); color: #ffffff; }
+        .screener-heading { display: block; min-width: 0; }
+        .screener-summary h2 { margin: 0; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+        .screener-summary p { margin: 3px 0 0; padding: 0; background: transparent; color: rgba(255,255,255,0.82); font-size: 11px; font-weight: 500; white-space: nowrap; }
+        .screener-kicker { color: #fcdc86; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+        .selected-ticker-list { max-width: 38%; padding: 7px 12px; border-radius: 12px; background: rgba(255,255,255,0.12); font-size: 12px; font-weight: 600; line-height: 1.25; }
+        .screener-filters { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 8px; padding: 9px 14px; background: #ffffff; border-bottom: 1px solid #dedfe5; }
+        .screener-filter { border: 1px solid #dedfe5; border-radius: 10px; padding: 6px 9px; background: #ffffff; }
+        .screener-filter span { display: block; color: #676f85; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+        .screener-filter strong { display: block; margin-top: 1px; color: #22262f; font-size: 11.5px; }
+        .screener-table-wrap { overflow-y: auto; overflow-x: hidden; max-height: calc(100vh - 260px); }
+        .screener-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.8px; }
+        .screener-table th { position: sticky; top: 0; background: #4c5263; color: #ffffff; text-align: center; vertical-align: middle; padding: 9px 6px; white-space: normal; z-index: 1; }
+        .screener-table th.sortable { cursor: pointer; user-select: none; }
+        .screener-table th.sortable .th-inner { display: inline-flex; align-items: center; justify-content: center; gap: 5px; line-height: 1; }
+        .screener-table th.sortable .sort-arrow { width: 0; height: 0; flex: none; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; border-bottom: 4.5px solid currentColor; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; }
+        .screener-table th.sortable:hover .sort-arrow { opacity: 0.4; }
+        .screener-table th.sortable.sort-asc .sort-arrow,
+        .screener-table th.sortable.sort-desc .sort-arrow { opacity: 1; }
+        .screener-table th.sortable.sort-desc .sort-arrow { transform: rotate(180deg); }
+        .screener-table th:first-child, .screener-table td:first-child { text-align: center; }
+        .screener-table td { border-top: 1px solid #dedfe5; padding: 8px 6px; text-align: center; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .screener-table th.screener-col-ticker, .screener-table td.screener-col-ticker { width: 4.5%; }
+        .screener-table th.screener-col-anchor-date, .screener-table td.screener-col-anchor-date { width: 6.8%; }
+        .screener-table th.screener-col-price, .screener-table td.screener-col-price { width: 4.8%; }
+        .screener-table th.screener-col-volume, .screener-table td.screener-col-volume { width: 5.3%; }
+        .screener-table th.screener-col-rvol, .screener-table td.screener-col-rvol { width: 4.2%; }
+        .screener-table th.screener-col-mcap, .screener-table td.screener-col-mcap { width: 5.5%; }
+        .screener-table th.screener-col-daily-change, .screener-table td.screener-col-daily-change { width: 5.3%; padding-left: 3px; padding-right: 3px; }
+        .screener-table th.screener-col-rsi14, .screener-table td.screener-col-rsi14 { width: 4.7%; }
+        .screener-table th.screener-col-daily-closing-position, .screener-table td.screener-col-daily-closing-position { width: 8.3%; padding-left: 5px; padding-right: 5px; }
+        .screener-table th.screener-col-macd, .screener-table td.screener-col-macd,
+        .screener-table th.screener-col-macd-signal, .screener-table td.screener-col-macd-signal { width: 4.7%; }
+        .screener-table th.screener-col-macd-histogram, .screener-table td.screener-col-macd-histogram { width: 5.8%; }
+        .screener-table th.screener-col-macd-gt-signal, .screener-table td.screener-col-macd-gt-signal { width: 7.2%; }
+        .screener-table th.screener-col-macd-cross, .screener-table td.screener-col-macd-cross { width: 6.8%; }
+        .screener-table th.screener-col-comment, .screener-table td.screener-col-comment { width: 7.2%; }
+        .screener-table th.screener-col-t0-t3-change, .screener-table td.screener-col-t0-t3-change { width: 8.2%; padding-left: 4px; padding-right: 4px; }
+        .screener-table th.screener-col-t0-t3-change .th-label { white-space: normal; }
+        .screener-table td[class*="screener-change-"], .screener-table td[class*="screener-rvol-"], .screener-table td[class*="screener-position-"], .screener-table td[class*="screener-comment-"] { font-weight: 700; }
+        .screener-table td.screener-change-pos-1 { background: #dcfce7; color: #166534; }
+        .screener-table td.screener-change-pos-2 { background: #86efac; color: #14532d; }
+        .screener-table td.screener-change-pos-3 { background: #22c55e; color: #052e16; }
+        .screener-table td.screener-change-pos-4 { background: #16a34a; color: #ffffff; }
+        .screener-table td.screener-change-pos-5 { background: #15803d; color: #ffffff; }
+        .screener-table td.screener-change-neg-1 { background: #fee2e2; color: #991b1b; }
+        .screener-table td.screener-change-neg-2 { background: #fecaca; color: #7f1d1d; }
+        .screener-table td.screener-change-neg-3 { background: #fca5a5; color: #7f1d1d; }
+        .screener-table td.screener-change-neg-4 { background: #ef4444; color: #ffffff; }
+        .screener-table td.screener-change-neg-5 { background: #b91c1c; color: #ffffff; }
+        .screener-table td.screener-rvol-1 { background: #dbeafe; color: #1e3a5f; }
+        .screener-table td.screener-rvol-2 { background: #bfdbfe; color: #1e3a5f; }
+        .screener-table td.screener-rvol-3 { background: #60a5fa; color: #0f172a; }
+        .screener-table td.screener-rvol-4 { background: #2563eb; color: #ffffff; }
+        .screener-table td.screener-rvol-5 { background: #1e40af; color: #ffffff; }
+        .screener-table td.screener-position-pos-1 { background: #dcfce7; color: #166534; }
+        .screener-table td.screener-position-pos-2 { background: #86efac; color: #14532d; }
+        .screener-table td.screener-position-pos-3 { background: #22c55e; color: #052e16; }
+        .screener-table td.screener-position-pos-4 { background: #16a34a; color: #ffffff; }
+        .screener-table td.screener-position-pos-5 { background: #15803d; color: #ffffff; }
+        .screener-table td.screener-position-neg-1 { background: #fee2e2; color: #991b1b; }
+        .screener-table td.screener-position-neg-2 { background: #fecaca; color: #7f1d1d; }
+        .screener-table td.screener-position-neg-3 { background: #fca5a5; color: #7f1d1d; }
+        .screener-table td.screener-position-neg-4 { background: #ef4444; color: #ffffff; }
+        .screener-table td.screener-position-neg-5 { background: #b91c1c; color: #ffffff; }
+        .screener-table td.screener-bool-yes { color: #16a34a; font-weight: 800; }
+        .screener-table td.screener-bool-no { color: #dc2626; font-weight: 800; }
+        .screener-table td.screener-comment-below { background: #e5e7eb; color: #4b5563; }
+        .screener-table td.screener-comment-5d { background: #d9f99d; color: #365314; }
+        .screener-table td.screener-comment-10d { background: #bef264; color: #365314; }
+        .screener-table td.screener-comment-1m { background: #86efac; color: #14532d; }
+        .screener-table td.screener-comment-2m { background: #34d399; color: #064e3b; }
+        .screener-table td.screener-comment-3m { background: #2dd4bf; color: #134e4a; }
+        .screener-table td.screener-comment-6m { background: #059669; color: #ffffff; }
+        .screener-table td.screener-comment-1y { background: #f3c736; color: #422006; }
+        .screener-table td.screener-momentum-positive, .screener-table td.screener-rsi-pos-1 { color: #16a34a; font-weight: 700; }
+        .screener-table td.screener-momentum-negative, .screener-table td.screener-rsi-neg-1 { color: #dc2626; font-weight: 700; }
+        .screener-table td.screener-rsi-pos-2 { color: #15803d; font-weight: 800; }
+        .screener-table td.screener-rsi-pos-3 { color: #166534; font-weight: 900; }
+        .screener-table td.screener-rsi-neg-2 { color: #b91c1c; font-weight: 800; }
+        .screener-table td.screener-rsi-neg-3 { color: #7f1d1d; font-weight: 900; }
+        .screener-table td.screener-comment-ath { color: #19803d; font-weight: 600; }
+        .screener-table tr.selected td:not([class*="screener-change-"]):not([class*="screener-rvol-"]):not([class*="screener-position-"]):not([class*="screener-comment-"]) { background: #ffffff; }
+        .screener-table tr.selected td[class*="screener-change-"], .screener-table tr.selected td[class*="screener-rvol-"], .screener-table tr.selected td[class*="screener-position-"], .screener-table tr.selected td[class*="screener-comment-"] { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.08); }
+        .report-notes { border-top: 1px solid #dedfe5; padding: 13px 18px 16px; background: #f8fafc; }
+        .report-notes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .report-notes h3 { margin: 0; color: #22262f; font-size: 13px; font-weight: 800; }
+        .report-notes-status { color: #676f85; font-size: 11px; font-weight: 700; }
+        .report-notes textarea { display: block; width: 100%; min-height: 92px; box-sizing: border-box; resize: vertical; border: 1px solid #c3c6d0; border-radius: 10px; padding: 10px 12px; background: #ffffff; color: #22262f; font: inherit; font-size: 12.5px; line-height: 1.45; }
+        .report-notes textarea:focus { border-color: #4c5263; box-shadow: 0 0 0 3px rgba(76,82,99,0.16); outline: none; }
+        .ticker-chart-link { border: none; background: transparent; color: #306dca; cursor: pointer; min-width: auto; padding: 0; font: inherit; font-weight: 600; text-decoration: none; }
+        .ticker-chart-link:hover { color: #2f91ef; text-decoration: underline; }
+        .history-panel { max-width: 1380px; margin: 16px auto 26px; }
+        .history-title { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 14px 18px; border-radius: 14px 14px 0 0; background: linear-gradient(135deg, #353945, #4c5263); color: #ffffff; }
+        .history-title h2 { margin: 0; font-size: 15px; }
+        .history-title p { margin: 0; color: rgba(255,255,255,0.76); font-size: 12px; font-weight: 600; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; padding: 14px; background: #ffffff; border: 1px solid #dedfe5; border-top: 0; border-radius: 0 0 14px 14px; box-shadow: 0 14px 34px rgba(20,22,29,0.08); }
+        .history-card { border: 1px solid #dedfe5; border-radius: 14px; background: #ffffff; padding: 13px 14px; box-shadow: 0 6px 16px rgba(20,22,29,0.06); }
+        .history-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .history-ticker { color: #306dca; font-size: 14px; }
+        .history-change { padding: 4px 10px; border-radius: 999px; color: #ffffff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .history-change.up { background: #00a449; }
+        .history-change.down { background: #d91e2b; }
+        .history-date { margin-top: 7px; color: #676f85; font-size: 11px; font-weight: 600; }
+        .history-range { position: relative; height: 12px; margin: 16px 2px 12px; border-radius: 999px; background: linear-gradient(90deg, #fbb4b4, #fdf2df 50%, #beeac1); box-shadow: inset 0 1px 2px rgba(20,22,29,0.18); }
+        .history-marker { position: absolute; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 1px 4px rgba(20,22,29,0.34); }
+        .history-marker.entry { background: #4c5263; }
+        .history-marker.last { background: #f3c736; }
+        .history-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .history-values span { display: block; padding: 7px 6px; border-radius: 10px; background: #f3f3f5; color: #22262f; font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+        .history-values em { display: block; margin-bottom: 2px; color: #676f85; font-size: 9px; font-style: normal; text-transform: uppercase; }
+        .history-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; color: #4c5263; font-size: 11px; font-weight: 600; }
+        .history-empty { max-width: 720px; margin: 24px auto; padding: 18px; border: 1px solid #dedfe5; border-radius: 14px; background: #ffffff; color: #676f85; font-size: 13px; font-weight: 600; text-align: center; }
+        .chart-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(20,22,29,0.62); z-index: 20; }
+        .chart-modal.open { display: flex; }
+        .chart-modal-card { width: min(1180px, 96vw); max-height: 92vh; overflow: auto; border-radius: 16px; background: #ffffff; box-shadow: 0 24px 70px rgba(0,0,0,0.35); border: 1px solid #c3c6d0; }
+        .chart-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #353945; color: #ffffff; font-weight: 700; }
+        .chart-modal-close { border: none; border-radius: 999px; background: rgba(255,255,255,0.12); color: #ffffff; min-width: auto; width: 32px; height: 32px; padding: 0; cursor: pointer; font-size: 18px; font-weight: 700; }
+        .chart-modal-body { padding: 14px; text-align: center; }
+        .chart-modal-body img { max-width: 100%; height: auto; border: 1px solid #dedfe5; border-radius: 10px; background: #ffffff; }
+        @media (max-width: 980px) {
+            .header { grid-template-columns: 1fr; gap: 12px; padding: 12px 16px; }
+            .tabs, .live-clock { justify-self: start; }
+            .live-clock { text-align: left; }
+            .live-clock span { text-align: left; }
+            button { font-size: 14px; padding: 10px 14px; }
+            .screener-summary { display: block; }
+            .selected-ticker-list { max-width: none; margin-top: 12px; }
+            .screener-filters { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+
+<script>
+(function () {
+    function isDarkStored() {
+        try { return localStorage.getItem('duoDarkTheme') === '1'; } catch (error) { return false; }
+    }
+    function syncToggle(dark) {
+        var toggle = document.getElementById('appThemeToggle');
+        if (toggle) { toggle.checked = dark; }
+    }
+    if (isDarkStored()) {
+        document.body.classList.add('dark-theme');
+    }
+    window.duoIsDarkTheme = function () {
+        return document.body.classList.contains('dark-theme');
+    };
+    window.duoSetDarkTheme = function (enabled) {
+        var dark = Boolean(enabled);
+        document.body.classList.toggle('dark-theme', dark);
+        try { localStorage.setItem('duoDarkTheme', dark ? '1' : '0'); } catch (error) {}
+        syncToggle(dark);
+        document.dispatchEvent(new CustomEvent('duothemechange', { detail: { dark: dark } }));
+    };
+    document.addEventListener('DOMContentLoaded', function () {
+        syncToggle(window.duoIsDarkTheme());
+    });
+})();
+</script>
+
+    <div class="header">
+        <div class="brand">
+            <img class="brand-logo" src="static/nras-logo-transparent.png" alt="NRAS Alpha">
+            <span class="brand-text">
+                <strong class="report-title">Inswing ScreenSim</strong>
+                <span class="report-subtitle">Screening and simulation review</span>
+            </span>
+        </div>
+        <div class="tabs">
+            <button type="button" onclick="goToAppRoute('/?reset=screener')">Screener</button>
+            <button class="active" type="button" data-main-tab="portfolio" onclick="showPortfolioSubTab(currentPortfolioSubTabId, document.querySelector('.portfolio-subtabs button.active') || document.querySelector('.portfolio-subtabs button'))">Portfolio</button>
+            <button type="button" onclick="showMainReportTab('history-30d', this)">30D Follow-Through</button>
+            <button type="button" onclick="goToAppRoute('/?panel=savedReports')">Saved Reports</button>
+        </div>
+        <span class="header-right">
+            <span class="live-clock" id="liveClockDate">--<span id="liveClockTime">--</span></span>
+
+<label class="theme-switch" title="Toggle dark theme">
+    <input type="checkbox" id="appThemeToggle" onchange="duoSetDarkTheme(this.checked)">
+    <span class="theme-switch-track" aria-hidden="true"></span>
+    <span>Dark</span>
+</label>
+
+        </span>
+    </div>
+    <div class="portfolio-subtabs-wrap" id="portfolioSubtabs">
+        <div class="portfolio-subtabs" aria-label="Portfolio report views">
+            <button class="active" type="button" onclick="showPortfolioSubTab('screened', this)">Selected Stocks</button>
+            <button type="button" onclick="showPortfolioSubTab('portfolio', this)">Account View</button>
+            <button type="button" onclick="showPortfolioSubTab('all-stocks', this)">All Stocks</button>
+            <button type="button" onclick="showPortfolioSubTab('individual', this)">Individual Stocks</button>
+        </div>
+    </div>
+<div class="live-refresh-banner" id="liveRefreshBanner">Live 1-min close: next update in <strong id="liveRefreshCountdown">60</strong>s<span id="liveRefreshSnapshot"></span></div>
+
+    <section id="screened" class="panel active">
+        <div class="screener-report">
+            <div class="screener-summary">
+                <div class="screener-heading">
+                    <h2>Anchor Date 31st Aug (Mon) 2026</h2>
+                    <p>3 selected from 28 scanner matches.</p>
+                </div>
+                <div class="selected-ticker-list">CRWD, NOW, SNDK</div>
+            </div>
+            <div class="screener-filters"><div class="screener-filter"><span>MCAP</span><strong>100.00B-500.00B</strong></div>
+<div class="screener-filter"><span>Volume</span><strong>&gt;= 1.00M</strong></div>
+<div class="screener-filter"><span>Price</span><strong>&gt;= 2</strong></div>
+<div class="screener-filter"><span>10D Velocity%</span><strong>&gt;= 3</strong></div>
+<div class="screener-filter"><span>RSI14</span><strong>&gt;= 45</strong></div>
+<div class="screener-filter"><span>MACD&gt;SIGNAL</span><strong>No</strong></div>
+<div class="screener-filter"><span>MACD Cross</span><strong>No</strong></div></div>
+            <div class="screener-table-wrap">
+                <table class="screener-table">
+                    <thead><tr><th class="sortable screener-col-ticker" data-sort-key="TICKER" aria-sort="none"><span class="th-inner"><span class="th-label">Ticker</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-anchor-date" data-sort-key="ANCHOR_DATE" aria-sort="none"><span class="th-inner"><span class="th-label">Anchor Date</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-price" data-sort-key="PRICE" aria-sort="none"><span class="th-inner"><span class="th-label">Price</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-volume" data-sort-key="VOLUME" aria-sort="none"><span class="th-inner"><span class="th-label">Volume</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-rvol" data-sort-key="RVOL" aria-sort="none"><span class="th-inner"><span class="th-label">Rvol</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-mcap" data-sort-key="MCAP" aria-sort="none"><span class="th-inner"><span class="th-label">Mcap</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-daily-change" data-sort-key="DAILY_CHANGE_%" aria-sort="none"><span class="th-inner"><span class="th-label">Change%</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-rsi14" data-sort-key="RSI14" aria-sort="none"><span class="th-inner"><span class="th-label">RSI14</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-daily-closing-position" data-sort-key="DAILY_CLOSING_POSITION" aria-sort="none"><span class="th-inner"><span class="th-label">Closing Position</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd" data-sort-key="MACD" aria-sort="none"><span class="th-inner"><span class="th-label">Macd</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-signal" data-sort-key="MACD_SIGNAL" aria-sort="none"><span class="th-inner"><span class="th-label">Signal</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-histogram" data-sort-key="MACD_HISTOGRAM" aria-sort="none"><span class="th-inner"><span class="th-label">Histogram</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-gt-signal" data-sort-key="MACD_GT_SIGNAL" aria-sort="none"><span class="th-inner"><span class="th-label">Macd &gt; Signal</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-cross" data-sort-key="MACD_CROSS" aria-sort="none"><span class="th-inner"><span class="th-label">MACD Cross</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-triple-ma-bullish" data-sort-key="TRIPLE_MA_BULLISH" aria-sort="none"><span class="th-inner"><span class="th-label">Triple MA</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-comment" data-sort-key="COMMENT" aria-sort="none"><span class="th-inner"><span class="th-label">Comment</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-t0-t3-change" data-sort-key="T0_T3_CHANGE_%" aria-sort="none"><span class="th-inner"><span class="th-label">Change % (T0-T3)</span><span class="sort-arrow" aria-hidden="true"></span></span></th></tr></thead>
+                    <tbody><tr class=" selected"><td class="screener-col-ticker" data-sort-value="CRWD"><button class="ticker-chart-link" type="button" onclick="openTickerChart('CRWD', '2026-08-31')">CRWD</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-31">2026-08-31</td><td class="screener-col-price" data-sort-value="231">231</td><td class="screener-col-volume" data-sort-value="17823542.3771">17.82M</td><td class="screener-col-rvol screener-rvol-1" data-sort-value="1.96584436616">1.97</td><td class="screener-col-mcap" data-sort-value="236528948502">236.53B</td><td class="screener-col-daily-change screener-change-pos-4" data-sort-value="0.0576923076923">5.77%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="62.9983604556">63</td><td class="screener-col-daily-closing-position screener-position-pos-2" data-sort-value="Up &amp; U1-U2">Up &amp; U1-U2</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="4.62517489553">4.63</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="3.35531911016">3.36</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="1.26985578537">1.27</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-1y" data-sort-value="1Y high">1Y high</td><td class="screener-col-t0-t3-change screener-change-neg-5" data-sort-value="-12.1694417765">-12.17%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="NOW"><button class="ticker-chart-link" type="button" onclick="openTickerChart('NOW', '2026-08-31')">NOW</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-31">2026-08-31</td><td class="screener-col-price" data-sort-value="147.99">147.99</td><td class="screener-col-volume" data-sort-value="26013730.5539">26.01M</td><td class="screener-col-rvol screener-rvol-1" data-sort-value="1.42542648835">1.43</td><td class="screener-col-mcap" data-sort-value="153001237380">153.00B</td><td class="screener-col-daily-change screener-change-pos-3" data-sort-value="0.0226660216986">2.27%</td><td class="screener-col-rsi14 screener-rsi-pos-3" data-sort-value="74.4449664111">74.44</td><td class="screener-col-daily-closing-position screener-position-pos-4" data-sort-value="Up &amp; U3-U4">Up &amp; U3-U4</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="7.61116401701">7.61</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="5.89580277027">5.9</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="1.71536124674">1.72</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-triple-ma-bullish screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-comment screener-comment-6m" data-sort-value="6M high">6M high</td><td class="screener-col-t0-t3-change screener-change-neg-4" data-sort-value="-7.3026536782">-7.30%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="SNDK"><button class="ticker-chart-link" type="button" onclick="openTickerChart('SNDK', '2026-08-31')">SNDK</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-31">2026-08-31</td><td class="screener-col-price" data-sort-value="1566.7">1566.7</td><td class="screener-col-volume" data-sort-value="23378842.8993">23.38M</td><td class="screener-col-rvol screener-rvol-1" data-sort-value="1.69783191061">1.7</td><td class="screener-col-mcap" data-sort-value="229394648867">229.39B</td><td class="screener-col-daily-change screener-change-pos-4" data-sort-value="0.0550310441891">5.50%</td><td class="screener-col-rsi14 screener-rsi-pos-1" data-sort-value="53.2290715269">53.23</td><td class="screener-col-daily-closing-position screener-position-pos-1" data-sort-value="Up &amp; Mid-U1">Up &amp; Mid-U1</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="10.3121562242">10.31</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="0.124146334276">0.12</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="10.1880098899">10.19</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-pos-2" data-sort-value="1.32010607995">+1.32%</td></tr></tbody>
+                </table>
+            </div>
+            <div class="report-notes">
+                <div class="report-notes-head">
+                    <h3>Report Notes</h3>
+                    <span class="report-notes-status" id="selectedStocksNoteStatus">Autosaved in this browser</span>
+                </div>
+                <textarea id="selectedStocksNote" rows="4" placeholder="Add your notes, observations, or follow-up reminders for this saved report..."></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section id="portfolio" class="panel">
+        <div class="image-wrap"><img class="fit-image" src="meta data/2_Portfolio Chart 10m 31 August-03 Sep 2026 085117.png?v=1788439883" alt="Portfolio performance"></div>
+    </section>
+    <section id="all-stocks" class="panel">
+        <div class="image-wrap">
+            <div class="all-stocks-stage">
+                <button class="replay-button" id="allStocksReplayButton" type="button" onclick="toggleAllStocksReplay()">&#9658; Replay</button>
+                <img class="fit-image" id="allStocksStaticImage" src="meta data/2_All Symbols Chart 10m 31 August-03 Sep 2026 085117.png?v=1788439889" alt="All stocks performance">
+                <div class="replay-wrap" id="allStocksReplayWrap"><svg class="replay-chart" id="allStocksReplayChart" role="img" aria-label="All stocks replay chart"></svg></div>
+            </div>
+            <span class="replay-status" id="allStocksReplayStatus">10-minute bars, 1 bar every 1/3 sec</span>
+        </div>
+    </section>
+    <section id="individual" class="panel">
+        <div class="stock-picker" id="stockPicker">
+            <button class="stock-button active" type="button" onclick="showStockChart(0, this)">SNDK</button>
+            <button class="stock-button" type="button" onclick="showStockChart(1, this)">NOW</button>
+            <button class="stock-button" type="button" onclick="showStockChart(2, this)">CRWD</button>
+        </div>
+        <div class="single-stock-wrap">
+            <img class="single-stock-image" id="selectedStockChart" src="meta data/2_SNDK Chart 10m 31 August-03 Sep 2026 085117.png?v=1788439885" alt="Selected stock chart">
+        </div>
+    </section>
+
+    <section id="history-30d" class="panel">
+        <div class="history-panel">
+            <div class="history-title">
+                <h2>30D Follow-Through</h2>
+                <p>Daily price range from entry date through up to 30 trading days.</p>
+            </div>
+            <div class="history-grid">
+                
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('CRWD', '2026-08-31')">CRWD</button>
+                    <span class="history-change down">-12.43%</span>
+                </div>
+                <div class="history-date">2026-08-31 to 2026-09-02 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 95.21%"></span>
+                    <span class="history-marker last" style="left: 8.47%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$200.60</span>
+                    <span><em>Entry</em>$232.29</span>
+                    <span><em>Last</em>$203.42</span>
+                    <span><em>High</em>$233.88</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 14.33%</span>
+                    <span>Low -13.64% · High +0.69%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('NOW', '2026-08-31')">NOW</button>
+                    <span class="history-change down">-8.15%</span>
+                </div>
+                <div class="history-date">2026-08-31 to 2026-09-02 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 94.33%"></span>
+                    <span class="history-marker last" style="left: 2.61%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$136.38</span>
+                    <span><em>Entry</em>$148.85</span>
+                    <span><em>Last</em>$136.72</span>
+                    <span><em>High</em>$149.60</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 8.88%</span>
+                    <span>Low -8.38% · High +0.50%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('SNDK', '2026-08-31')">SNDK</button>
+                    <span class="history-change up">+1.72%</span>
+                </div>
+                <div class="history-date">2026-08-31 to 2026-09-02 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 48.50%"></span>
+                    <span class="history-marker last" style="left: 64.89%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$1,449.50</span>
+                    <span><em>Entry</em>$1,527.15</span>
+                    <span><em>Last</em>$1,553.40</span>
+                    <span><em>High</em>$1,609.61</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 10.48%</span>
+                    <span>Low -5.08% · High +5.40%</span>
+                </div>
+            </article>
+
+            </div>
+        </div>
+    </section>
+
+    <div class="chart-modal" id="tickerChartModal" aria-hidden="true">
+        <div class="chart-modal-card" role="dialog" aria-modal="true" aria-labelledby="tickerChartTitle">
+            <div class="chart-modal-header">
+                <span id="tickerChartTitle">Daily chart</span>
+                <button class="chart-modal-close" type="button" id="tickerChartClose" aria-label="Close chart">&times;</button>
+            </div>
+            <div class="chart-modal-body">
+                <img id="tickerChartImage" alt="6 month daily chart with MACD">
+            </div>
+        </div>
+    </div>
+    <script>
+        const allStocksReplayData = {"series": [{"ticker": "SNDK", "color": "#3962de", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-31 15:50"}, {"x": 1.0, "y": 0.31332874963165724, "time": "2026-08-31 15:51"}, {"x": 2.0, "y": 0.4583701666502963, "time": "2026-08-31 15:52"}, {"x": 3.0, "y": 0.668565628785634, "time": "2026-08-31 15:53"}, {"x": 4.0, "y": 1.21795501424221, "time": "2026-08-31 15:54"}, {"x": 5.0, "y": 2.3311397046786437, "time": "2026-08-31 15:55"}, {"x": 6.0, "y": 2.4621026094358713, "time": "2026-08-31 15:56"}, {"x": 7.0, "y": 2.8608846544216235, "time": "2026-08-31 15:57"}, {"x": 8.0, "y": 2.5112136987198315, "time": "2026-08-31 15:58"}, {"x": 9.0, "y": 2.7803424679959274, "time": "2026-08-31 15:59"}, {"x": 10.0, "y": 2.3016730511082644, "time": "2026-08-31 16:00"}, {"x": 11.6, "y": 0.9007039256130606, "time": "2026-09-01 09:30"}, {"x": 12.6, "y": 1.016101889139898, "time": "2026-09-01 09:40"}, {"x": 13.6, "y": 0.7766100252103525, "time": "2026-09-01 09:50"}, {"x": 14.6, "y": 0.5467701273614188, "time": "2026-09-01 10:00"}, {"x": 15.6, "y": 0.34051010051403074, "time": "2026-09-01 10:10"}, {"x": 16.6, "y": 0.6217463903349305, "time": "2026-09-01 10:20"}, {"x": 17.6, "y": 1.3699898503748713, "time": "2026-09-01 10:30"}, {"x": 18.6, "y": 2.282683429918469, "time": "2026-09-01 10:40"}, {"x": 19.6, "y": 2.583243296336301, "time": "2026-09-01 10:50"}, {"x": 20.6, "y": 2.1857708803981195, "time": "2026-09-01 11:00"}, {"x": 21.6, "y": 1.705791834462885, "time": "2026-09-01 11:10"}, {"x": 22.6, "y": 2.6159840225256072, "time": "2026-09-01 11:20"}, {"x": 23.6, "y": 3.4056903382117003, "time": "2026-09-01 11:30"}, {"x": 24.6, "y": 4.9713584127295825, "time": "2026-09-01 11:40"}, {"x": 25.6, "y": 4.7438038175686685, "time": "2026-09-01 11:50"}, {"x": 26.6, "y": 4.347968437939944, "time": "2026-09-01 12:00"}, {"x": 27.6, "y": 3.8990930818845455, "time": "2026-09-01 12:10"}, {"x": 28.6, "y": 3.6970828012965202, "time": "2026-09-01 12:20"}, {"x": 29.6, "y": 2.9087188553842087, "time": "2026-09-01 12:30"}, {"x": 30.6, "y": 2.9230920341813094, "time": "2026-09-01 12:40"}, {"x": 31.6, "y": 2.899518711325015, "time": "2026-09-01 12:50"}, {"x": 32.6, "y": 2.609435877287752, "time": "2026-09-01 13:00"}, {"x": 33.6, "y": 2.5344596143142404, "time": "2026-09-01 13:10"}, {"x": 34.6, "y": 2.4129915201519108, "time": "2026-09-01 13:20"}, {"x": 35.6, "y": 2.282028615394683, "time": "2026-09-01 13:30"}, {"x": 36.6, "y": 1.874733981599704, "time": "2026-09-01 13:40"}, {"x": 37.6, "y": 2.3710833906295914, "time": "2026-09-01 13:50"}, {"x": 38.6, "y": 1.8606554693383075, "time": "2026-09-01 14:00"}, {"x": 39.6, "y": 1.1616409651966086, "time": "2026-09-01 14:10"}, {"x": 40.6, "y": 1.0761876698425135, "time": "2026-09-01 14:20"}, {"x": 41.6, "y": 0.9010247847297247, "time": "2026-09-01 14:30"}, {"x": 42.6, "y": 0.45247683593621146, "time": "2026-09-01 14:40"}, {"x": 43.6, "y": 0.6731493304521475, "time": "2026-09-01 14:50"}, {"x": 44.6, "y": 0.6934485806895142, "time": "2026-09-01 15:00"}, {"x": 45.6, "y": 0.796581868185834, "time": "2026-09-01 15:10"}, {"x": 46.6, "y": 0.7976164751334095, "time": "2026-09-01 15:20"}, {"x": 47.6, "y": 0.600464918311878, "time": "2026-09-01 15:30"}, {"x": 48.6, "y": 0.9953180761549172, "time": "2026-09-01 15:40"}, {"x": 49.6, "y": 0.644337491405554, "time": "2026-09-01 15:50"}, {"x": 50.6, "y": 0.6482663785482673, "time": "2026-09-01 16:00"}, {"x": 52.2, "y": 2.496152964672749, "time": "2026-09-02 09:30"}, {"x": 53.2, "y": 1.8304292309203336, "time": "2026-09-02 09:40"}, {"x": 54.2, "y": -0.22001767999215055, "time": "2026-09-02 09:50"}, {"x": 55.2, "y": 0.10738958190091821, "time": "2026-09-02 10:00"}, {"x": 56.2, "y": 0.4812886749828051, "time": "2026-09-02 10:10"}, {"x": 57.2, "y": 0.5140294011721119, "time": "2026-09-02 10:20"}, {"x": 58.2, "y": 0.9488262449661139, "time": "2026-09-02 10:30"}, {"x": 59.2, "y": 0.05565923452181574, "time": "2026-09-02 10:40"}, {"x": 60.2, "y": -0.14766067511378114, "time": "2026-09-02 10:50"}, {"x": 61.2, "y": 0.4531381986052333, "time": "2026-09-02 11:00"}, {"x": 62.2, "y": 0.7062174639033398, "time": "2026-09-02 11:10"}, {"x": 63.2, "y": 1.2467668532888034, "time": "2026-09-02 11:20"}, {"x": 64.2, "y": 1.1590217071014515, "time": "2026-09-02 11:30"}, {"x": 65.2, "y": 0.644337491405554, "time": "2026-09-02 11:40"}, {"x": 66.2, "y": 1.1586942998395662, "time": "2026-09-02 11:50"}, {"x": 67.2, "y": 1.2343253773368634, "time": "2026-09-02 12:00"}, {"x": 68.2, "y": 1.1983105785286285, "time": "2026-09-02 12:10"}, {"x": 69.2, "y": 1.0568706413908175, "time": "2026-09-02 12:20"}, {"x": 70.2, "y": 0.9740366041318795, "time": "2026-09-02 12:30"}, {"x": 71.2, "y": 0.9390040271093159, "time": "2026-09-02 12:40"}, {"x": 72.2, "y": 0.637134531643913, "time": "2026-09-02 12:50"}, {"x": 73.2, "y": 0.5912975149788804, "time": "2026-09-02 13:00"}, {"x": 74.2, "y": 0.8479848083030362, "time": "2026-09-02 13:10"}, {"x": 75.2, "y": 0.7805389123530658, "time": "2026-09-02 13:20"}, {"x": 76.2, "y": 0.8787610909209865, "time": "2026-09-02 13:30"}, {"x": 77.2, "y": 1.0284516910585013, "time": "2026-09-02 13:40"}, {"x": 78.2, "y": 0.7602396621156992, "time": "2026-09-02 13:50"}, {"x": 79.2, "y": 0.7281537504501778, "time": "2026-09-02 14:00"}, {"x": 80.2, "y": 0.8578070261598342, "time": "2026-09-02 14:10"}, {"x": 81.2, "y": 0.9396588416331014, "time": "2026-09-02 14:20"}, {"x": 82.2, "y": 1.1361031987689427, "time": "2026-09-02 14:30"}, {"x": 83.2, "y": 1.4065415970926247, "time": "2026-09-02 14:40"}, {"x": 84.2, "y": 1.4058867825688242, "time": "2026-09-02 14:50"}, {"x": 85.2, "y": 0.8633729496120188, "time": "2026-09-02 15:00"}, {"x": 86.2, "y": 0.9396588416331014, "time": "2026-09-02 15:10"}, {"x": 87.2, "y": 0.8517565399600505, "time": "2026-09-02 15:20"}, {"x": 88.2, "y": 1.0987787709131371, "time": "2026-09-02 15:30"}, {"x": 89.2, "y": 1.0873195167468825, "time": "2026-09-02 15:40"}, {"x": 90.2, "y": 1.6930229512490595, "time": "2026-09-02 15:50"}, {"x": 91.2, "y": 1.3201060799528437, "time": "2026-09-02 16:00"}]}, {"ticker": "NOW", "color": "#3fb277", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-31 15:50"}, {"x": 1.0, "y": -0.03359086328517497, "time": "2026-08-31 15:51"}, {"x": 2.0, "y": -0.036949949613709655, "time": "2026-08-31 15:52"}, {"x": 3.0, "y": 0.12428619415519133, "time": "2026-08-31 15:53"}, {"x": 4.0, "y": -0.08733624454148166, "time": "2026-08-31 15:54"}, {"x": 5.0, "y": -0.35606315082297696, "time": "2026-08-31 15:55"}, {"x": 6.0, "y": -0.35606315082297696, "time": "2026-08-31 15:56"}, {"x": 7.0, "y": -0.41652670473631476, "time": "2026-08-31 15:57"}, {"x": 8.0, "y": -0.24857238831038267, "time": "2026-08-31 15:58"}, {"x": 9.0, "y": -0.5172992945918587, "time": "2026-08-31 15:59"}, {"x": 10.0, "y": -0.34625461874370145, "time": "2026-08-31 16:00"}, {"x": 11.6, "y": -2.472287537789726, "time": "2026-09-01 09:30"}, {"x": 12.6, "y": -2.3177023849512834, "time": "2026-09-01 09:40"}, {"x": 13.6, "y": -2.986227746053069, "time": "2026-09-01 09:50"}, {"x": 14.6, "y": -2.5932146456163827, "time": "2026-09-01 10:00"}, {"x": 15.6, "y": -2.929123278468247, "time": "2026-09-01 10:10"}, {"x": 16.6, "y": -2.2908968760497124, "time": "2026-09-01 10:20"}, {"x": 17.6, "y": -2.2841787033926813, "time": "2026-09-01 10:30"}, {"x": 18.6, "y": -2.4521330198186133, "time": "2026-09-01 10:40"}, {"x": 19.6, "y": -3.4061135371179, "time": "2026-09-01 10:50"}, {"x": 20.6, "y": -4.178703392677191, "time": "2026-09-01 11:00"}, {"x": 21.6, "y": -3.876385623110502, "time": "2026-09-01 11:10"}, {"x": 22.6, "y": -3.668122270742363, "time": "2026-09-01 11:20"}, {"x": 23.6, "y": -3.812562982868648, "time": "2026-09-01 11:30"}, {"x": 24.6, "y": -3.547195162915688, "time": "2026-09-01 11:40"}, {"x": 25.6, "y": -3.82599932818273, "time": "2026-09-01 11:50"}, {"x": 26.6, "y": -4.158548874706079, "time": "2026-09-01 12:00"}, {"x": 27.6, "y": -4.339939536446092, "time": "2026-09-01 12:10"}, {"x": 28.6, "y": -4.232448773933479, "time": "2026-09-01 12:20"}, {"x": 29.6, "y": -4.346657709103123, "time": "2026-09-01 12:30"}, {"x": 30.6, "y": -4.2861941551897855, "time": "2026-09-01 12:40"}, {"x": 31.6, "y": -3.973799126637549, "time": "2026-09-01 12:50"}, {"x": 32.6, "y": -3.7856902922405045, "time": "2026-09-01 13:00"}, {"x": 33.6, "y": -3.241518307020483, "time": "2026-09-01 13:10"}, {"x": 34.6, "y": -3.493449781659381, "time": "2026-09-01 13:20"}, {"x": 35.6, "y": -3.231441048034936, "time": "2026-09-01 13:30"}, {"x": 36.6, "y": -3.117232112865292, "time": "2026-09-01 13:40"}, {"x": 37.6, "y": -3.191132012092711, "time": "2026-09-01 13:50"}, {"x": 38.6, "y": -3.1205911991938073, "time": "2026-09-01 14:00"}, {"x": 39.6, "y": -3.1709774941215985, "time": "2026-09-01 14:10"}, {"x": 40.6, "y": -3.3725898555592777, "time": "2026-09-01 14:20"}, {"x": 41.6, "y": -3.5740678535438315, "time": "2026-09-01 14:30"}, {"x": 42.6, "y": -3.4800134363453186, "time": "2026-09-01 14:40"}, {"x": 43.6, "y": -3.7353039973127324, "time": "2026-09-01 14:50"}, {"x": 44.6, "y": -3.446422573060125, "time": "2026-09-01 15:00"}, {"x": 45.6, "y": -3.345649983204561, "time": "2026-09-01 15:10"}, {"x": 46.6, "y": -3.241518307020483, "time": "2026-09-01 15:20"}, {"x": 47.6, "y": -3.174336580450114, "time": "2026-09-01 15:30"}, {"x": 48.6, "y": -3.4564998320456715, "time": "2026-09-01 15:40"}, {"x": 49.6, "y": -4.01746724890829, "time": "2026-09-01 15:50"}, {"x": 50.6, "y": -4.69600268726905, "time": "2026-09-01 16:00"}, {"x": 52.2, "y": -6.032919046019476, "time": "2026-09-02 09:30"}, {"x": 53.2, "y": -5.478669801813908, "time": "2026-09-02 09:40"}, {"x": 54.2, "y": -5.045347665434996, "time": "2026-09-02 09:50"}, {"x": 55.2, "y": -6.321800470272083, "time": "2026-09-02 10:00"}, {"x": 56.2, "y": -6.973463218004699, "time": "2026-09-02 10:10"}, {"x": 57.2, "y": -6.704736311723204, "time": "2026-09-02 10:20"}, {"x": 58.2, "y": -6.711454484380236, "time": "2026-09-02 10:30"}, {"x": 59.2, "y": -6.530063822640242, "time": "2026-09-02 10:40"}, {"x": 60.2, "y": -7.087672153174325, "time": "2026-09-02 10:50"}, {"x": 61.2, "y": -7.107826671145438, "time": "2026-09-02 11:00"}, {"x": 62.2, "y": -7.238360765871671, "time": "2026-09-02 11:10"}, {"x": 63.2, "y": -7.531071548538804, "time": "2026-09-02 11:20"}, {"x": 64.2, "y": -7.6721531743365725, "time": "2026-09-02 11:30"}, {"x": 65.2, "y": -8.021498152502518, "time": "2026-09-02 11:40"}, {"x": 66.2, "y": -8.132348001343628, "time": "2026-09-02 11:50"}, {"x": 67.2, "y": -7.981189116560293, "time": "2026-09-02 12:00"}, {"x": 68.2, "y": -8.229761504870675, "time": "2026-09-02 12:10"}, {"x": 69.2, "y": -8.125629828686597, "time": "2026-09-02 12:20"}, {"x": 70.2, "y": -8.001343634531406, "time": "2026-09-02 12:30"}, {"x": 71.2, "y": -7.732616728249911, "time": "2026-09-02 12:40"}, {"x": 72.2, "y": -7.699563318777297, "time": "2026-09-02 12:50"}, {"x": 73.2, "y": -7.793080282163248, "time": "2026-09-02 13:00"}, {"x": 74.2, "y": -7.7897211958347325, "time": "2026-09-02 13:10"}, {"x": 75.2, "y": -7.762848505206589, "time": "2026-09-02 13:20"}, {"x": 76.2, "y": -7.766207591535104, "time": "2026-09-02 13:30"}, {"x": 77.2, "y": -7.873698354047698, "time": "2026-09-02 13:40"}, {"x": 78.2, "y": -7.907289217332873, "time": "2026-09-02 13:50"}, {"x": 79.2, "y": -7.793080282163248, "time": "2026-09-02 14:00"}, {"x": 80.2, "y": -7.685589519650654, "time": "2026-09-02 14:10"}, {"x": 81.2, "y": -7.705744037621766, "time": "2026-09-02 14:20"}, {"x": 82.2, "y": -8.051729929459176, "time": "2026-09-02 14:30"}, {"x": 83.2, "y": -8.108834397044, "time": "2026-09-02 14:40"}, {"x": 84.2, "y": -8.155861605643256, "time": "2026-09-02 14:50"}, {"x": 85.2, "y": -8.041652670473631, "time": "2026-09-02 15:00"}, {"x": 86.2, "y": -7.833389318105473, "time": "2026-09-02 15:10"}, {"x": 87.2, "y": -7.860262008733618, "time": "2026-09-02 15:20"}, {"x": 88.2, "y": -8.048370843130662, "time": "2026-09-02 15:30"}, {"x": 89.2, "y": -7.967752771246212, "time": "2026-09-02 15:40"}, {"x": 90.2, "y": -8.149143432986225, "time": "2026-09-02 15:50"}, {"x": 91.2, "y": -7.302653678199533, "time": "2026-09-02 16:00"}]}, {"ticker": "CRWD", "color": "#e35151", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-31 15:50"}, {"x": 1.0, "y": -0.11843204751402867, "time": "2026-08-31 15:51"}, {"x": 2.0, "y": -0.1700927007371603, "time": "2026-08-31 15:52"}, {"x": 3.0, "y": -0.3595150958886348, "time": "2026-08-31 15:53"}, {"x": 4.0, "y": -0.040941067679331214, "time": "2026-08-31 15:54"}, {"x": 5.0, "y": -0.26049884387762845, "time": "2026-08-31 15:55"}, {"x": 6.0, "y": -0.6694790152274124, "time": "2026-08-31 15:56"}, {"x": 7.0, "y": -0.5924185408362431, "time": "2026-08-31 15:57"}, {"x": 8.0, "y": -0.570462763216406, "time": "2026-08-31 15:58"}, {"x": 9.0, "y": -0.5446324366048403, "time": "2026-08-31 15:59"}, {"x": 10.0, "y": -0.9191721724725324, "time": "2026-08-31 16:00"}, {"x": 11.6, "y": -3.5237301058053254, "time": "2026-09-01 09:30"}, {"x": 12.6, "y": -4.070472019083439, "time": "2026-09-01 09:40"}, {"x": 13.6, "y": -5.372750985749836, "time": "2026-09-01 09:50"}, {"x": 14.6, "y": -5.430912271170207, "time": "2026-09-01 10:00"}, {"x": 15.6, "y": -6.270354835501718, "time": "2026-09-01 10:10"}, {"x": 16.6, "y": -6.799876531038793, "time": "2026-09-01 10:20"}, {"x": 17.6, "y": -6.616911717540217, "time": "2026-09-01 10:30"}, {"x": 18.6, "y": -7.010824198366576, "time": "2026-09-01 10:40"}, {"x": 19.6, "y": -7.5080579856392, "time": "2026-09-01 10:50"}, {"x": 20.6, "y": -7.665192472526224, "time": "2026-09-01 11:00"}, {"x": 21.6, "y": -7.835672628162546, "time": "2026-09-01 11:10"}, {"x": 22.6, "y": -7.764208724537218, "time": "2026-09-01 11:20"}, {"x": 23.6, "y": -7.65227730922044, "time": "2026-09-01 11:30"}, {"x": 24.6, "y": -7.512363040074457, "time": "2026-09-01 11:40"}, {"x": 25.6, "y": -7.381058879799012, "time": "2026-09-01 11:50"}, {"x": 26.6, "y": -7.480075131810006, "time": "2026-09-01 12:00"}, {"x": 27.6, "y": -7.449939750763184, "time": "2026-09-01 12:10"}, {"x": 28.6, "y": -7.635057091479388, "time": "2026-09-01 12:20"}, {"x": 29.6, "y": -7.688870271920148, "time": "2026-09-01 12:30"}, {"x": 30.6, "y": -7.9450210108181665, "time": "2026-09-01 12:40"}, {"x": 31.6, "y": -7.012976725584205, "time": "2026-09-01 12:50"}, {"x": 32.6, "y": -7.381058879799012, "time": "2026-09-01 13:00"}, {"x": 33.6, "y": -7.540345893903651, "time": "2026-09-01 13:10"}, {"x": 34.6, "y": -7.527430730597868, "time": "2026-09-01 13:20"}, {"x": 35.6, "y": -7.415499315281091, "time": "2026-09-01 13:30"}, {"x": 36.6, "y": -7.665192472526224, "time": "2026-09-01 13:40"}, {"x": 37.6, "y": -7.846004758807172, "time": "2026-09-01 13:50"}, {"x": 38.6, "y": -7.970851337429731, "time": "2026-09-01 14:00"}, {"x": 39.6, "y": -7.729768289055125, "time": "2026-09-01 14:10"}, {"x": 40.6, "y": -7.871835085418738, "time": "2026-09-01 14:20"}, {"x": 41.6, "y": -8.33247590999164, "time": "2026-09-01 14:30"}, {"x": 42.6, "y": -8.17534142310463, "time": "2026-09-01 14:40"}, {"x": 43.6, "y": -7.884793299268875, "time": "2026-09-01 14:50"}, {"x": 44.6, "y": -8.087087807181778, "time": "2026-09-01 15:00"}, {"x": 45.6, "y": -7.719005652966983, "time": "2026-09-01 15:10"}, {"x": 46.6, "y": -7.960088701341589, "time": "2026-09-01 15:20"}, {"x": 47.6, "y": -7.505905458421572, "time": "2026-09-01 15:30"}, {"x": 48.6, "y": -7.256212301176439, "time": "2026-09-01 15:40"}, {"x": 49.6, "y": -7.411194260845834, "time": "2026-09-01 15:50"}, {"x": 50.6, "y": -7.727314408027031, "time": "2026-09-01 16:00"}, {"x": 52.2, "y": -10.599087070156463, "time": "2026-09-02 09:30"}, {"x": 53.2, "y": -10.485261430888167, "time": "2026-09-02 09:40"}, {"x": 54.2, "y": -11.423504994508903, "time": "2026-09-02 09:50"}, {"x": 55.2, "y": -11.582792008613554, "time": "2026-09-02 10:00"}, {"x": 56.2, "y": -11.448345158600363, "time": "2026-09-02 10:10"}, {"x": 57.2, "y": -10.575409270762524, "time": "2026-09-02 10:20"}, {"x": 58.2, "y": -10.799272101396092, "time": "2026-09-02 10:30"}, {"x": 59.2, "y": -11.182421946134296, "time": "2026-09-02 10:40"}, {"x": 60.2, "y": -11.989619652745699, "time": "2026-09-02 10:50"}, {"x": 61.2, "y": -11.432115103379429, "time": "2026-09-02 11:00"}, {"x": 62.2, "y": -11.690418369495074, "time": "2026-09-02 11:10"}, {"x": 63.2, "y": -12.318956317043156, "time": "2026-09-02 11:20"}, {"x": 64.2, "y": -11.965123893009071, "time": "2026-09-02 11:30"}, {"x": 65.2, "y": -11.983162071092812, "time": "2026-09-02 11:40"}, {"x": 66.2, "y": -11.970246907787029, "time": "2026-09-02 11:50"}, {"x": 67.2, "y": -12.27160071825528, "time": "2026-09-02 12:00"}, {"x": 68.2, "y": -12.207455407169896, "time": "2026-09-02 12:10"}, {"x": 69.2, "y": -12.27160071825528, "time": "2026-09-02 12:20"}, {"x": 70.2, "y": -12.323261371478413, "time": "2026-09-02 12:30"}, {"x": 71.2, "y": -12.54281914767671, "time": "2026-09-02 12:40"}, {"x": 72.2, "y": -12.697801107346104, "time": "2026-09-02 12:50"}, {"x": 73.2, "y": -12.749461760569236, "time": "2026-09-02 13:00"}, {"x": 74.2, "y": -12.859240648668385, "time": "2026-09-02 13:10"}, {"x": 75.2, "y": -12.516988821065144, "time": "2026-09-02 13:20"}, {"x": 76.2, "y": -12.626767709164294, "time": "2026-09-02 13:30"}, {"x": 77.2, "y": -12.641835399687718, "time": "2026-09-02 13:40"}, {"x": 78.2, "y": -12.889376029715208, "time": "2026-09-02 13:50"}, {"x": 79.2, "y": -12.947494264591224, "time": "2026-09-02 14:00"}, {"x": 80.2, "y": -12.811885049880512, "time": "2026-09-02 14:10"}, {"x": 81.2, "y": -12.90444372023862, "time": "2026-09-02 14:20"}, {"x": 82.2, "y": -13.498541232304609, "time": "2026-09-02 14:30"}, {"x": 83.2, "y": -13.33929726874431, "time": "2026-09-02 14:40"}, {"x": 84.2, "y": -13.509303868392763, "time": "2026-09-02 14:50"}, {"x": 85.2, "y": -12.570802001505903, "time": "2026-09-02 15:00"}, {"x": 86.2, "y": -12.36631191583102, "time": "2026-09-02 15:10"}, {"x": 87.2, "y": -12.08071460459582, "time": "2026-09-02 15:20"}, {"x": 88.2, "y": -12.684885944040323, "time": "2026-09-02 15:30"}, {"x": 89.2, "y": -12.680580889605054, "time": "2026-09-02 15:40"}, {"x": 90.2, "y": -12.426582677924676, "time": "2026-09-02 15:50"}, {"x": 91.2, "y": -12.16944177650654, "time": "2026-09-02 16:00"}]}, {"ticker": "SPY", "color": "#111827", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-31 15:50"}, {"x": 1.0, "y": 0.029980708066116354, "time": "2026-08-31 15:51"}, {"x": 2.0, "y": 0.04953334376140511, "time": "2026-08-31 15:52"}, {"x": 3.0, "y": 0.018249126648937165, "time": "2026-08-31 15:53"}, {"x": 4.0, "y": 0.029003076281360063, "time": "2026-08-31 15:54"}, {"x": 5.0, "y": -0.005214036185406385, "time": "2026-08-31 15:55"}, {"x": 6.0, "y": 0.018900881172112964, "time": "2026-08-31 15:56"}, {"x": 7.0, "y": 0.0026070180927031924, "time": "2026-08-31 15:57"}, {"x": 8.0, "y": 0.01629386307940977, "time": "2026-08-31 15:58"}, {"x": 9.0, "y": -0.02737368997339834, "time": "2026-08-31 15:59"}, {"x": 10.0, "y": 0.02085614474165518, "time": "2026-08-31 16:00"}, {"x": 11.6, "y": -0.7026044110746078, "time": "2026-09-01 09:30"}, {"x": 12.6, "y": -0.6465404869909697, "time": "2026-09-01 09:40"}, {"x": 13.6, "y": -0.6706554043485038, "time": "2026-09-01 09:50"}, {"x": 14.6, "y": -0.5552948537462838, "time": "2026-09-01 10:00"}, {"x": 15.6, "y": -0.501850982845824, "time": "2026-09-01 10:10"}, {"x": 16.6, "y": -0.44195474216590735, "time": "2026-09-01 10:20"}, {"x": 17.6, "y": -0.37671411439595215, "time": "2026-09-01 10:30"}, {"x": 18.6, "y": -0.42233693101830244, "time": "2026-09-01 10:40"}, {"x": 19.6, "y": -0.4718702747797076, "time": "2026-09-01 10:50"}, {"x": 20.6, "y": -0.5683299442098146, "time": "2026-09-01 11:00"}, {"x": 21.6, "y": -0.5044580009385271, "time": "2026-09-01 11:10"}, {"x": 22.6, "y": -0.4653527295479348, "time": "2026-09-01 11:20"}, {"x": 23.6, "y": -0.3988737681839441, "time": "2026-09-01 11:30"}, {"x": 24.6, "y": -0.3389123520517262, "time": "2026-09-01 11:40"}, {"x": 25.6, "y": -0.37410709630324895, "time": "2026-09-01 11:50"}, {"x": 26.6, "y": -0.42624745815735726, "time": "2026-09-01 12:00"}, {"x": 27.6, "y": -0.5396527451900499, "time": "2026-09-01 12:10"}, {"x": 28.6, "y": -0.602234214505446, "time": "2026-09-01 12:20"}, {"x": 29.6, "y": -0.6452369779446181, "time": "2026-09-01 12:30"}, {"x": 30.6, "y": -0.6778247041034375, "time": "2026-09-01 12:40"}, {"x": 31.6, "y": -0.63871943271286, "time": "2026-09-01 12:50"}, {"x": 32.6, "y": -0.7117159393086088, "time": "2026-09-01 13:00"}, {"x": 33.6, "y": -0.7240992752489638, "time": "2026-09-01 13:10"}, {"x": 34.6, "y": -0.7143229574013268, "time": "2026-09-01 13:20"}, {"x": 35.6, "y": -0.6836904948120347, "time": "2026-09-01 13:30"}, {"x": 36.6, "y": -0.7280098023880186, "time": "2026-09-01 13:40"}, {"x": 37.6, "y": -0.6960738307523748, "time": "2026-09-01 13:50"}, {"x": 38.6, "y": -0.7175817300172057, "time": "2026-09-01 14:00"}, {"x": 39.6, "y": -0.7045466395536749, "time": "2026-09-01 14:10"}, {"x": 40.6, "y": -0.7755878825798962, "time": "2026-09-01 14:20"}, {"x": 41.6, "y": -0.8629229886855421, "time": "2026-09-01 14:30"}, {"x": 42.6, "y": -0.9085458053078777, "time": "2026-09-01 14:40"}, {"x": 43.6, "y": -0.8382214922571481, "time": "2026-09-01 14:50"}, {"x": 44.6, "y": -0.7905782366129543, "time": "2026-09-01 15:00"}, {"x": 45.6, "y": -0.750821210699201, "time": "2026-09-01 15:10"}, {"x": 46.6, "y": -0.7560352468846075, "time": "2026-09-01 15:20"}, {"x": 47.6, "y": -0.8225142082485981, "time": "2026-09-01 15:30"}, {"x": 48.6, "y": -0.7690703373481382, "time": "2026-09-01 15:40"}, {"x": 49.6, "y": -0.71692997549403, "time": "2026-09-01 15:50"}, {"x": 50.6, "y": -0.71692997549403, "time": "2026-09-01 16:00"}, {"x": 52.2, "y": -0.611345742739447, "time": "2026-09-02 09:30"}, {"x": 53.2, "y": -0.660879086500852, "time": "2026-09-02 09:40"}, {"x": 54.2, "y": -0.5337869544814529, "time": "2026-09-02 09:50"}, {"x": 55.2, "y": -0.44710360289899764, "time": "2026-09-02 10:00"}, {"x": 56.2, "y": -0.2998070806611339, "time": "2026-09-02 10:10"}, {"x": 57.2, "y": -0.246363209760674, "time": "2026-09-02 10:20"}, {"x": 58.2, "y": -0.1668491579331525, "time": "2026-09-02 10:30"}, {"x": 59.2, "y": -0.17467021221126208, "time": "2026-09-02 10:40"}, {"x": 60.2, "y": -0.24114917357526758, "time": "2026-09-02 10:50"}, {"x": 61.2, "y": -0.2242035559726672, "time": "2026-09-02 11:00"}, {"x": 62.2, "y": -0.15446582199279754, "time": "2026-09-02 11:10"}, {"x": 63.2, "y": -0.11275353250951681, "time": "2026-09-02 11:20"}, {"x": 64.2, "y": -0.1701079305490315, "time": "2026-09-02 11:30"}, {"x": 65.2, "y": -0.27634391782679035, "time": "2026-09-02 11:40"}, {"x": 66.2, "y": -0.16098336722457032, "time": "2026-09-02 11:50"}, {"x": 67.2, "y": -0.18509828458208968, "time": "2026-09-02 12:00"}, {"x": 68.2, "y": -0.2229130820167907, "time": "2026-09-02 12:10"}, {"x": 69.2, "y": -0.30111058970748544, "time": "2026-09-02 12:20"}, {"x": 70.2, "y": -0.27017832003753334, "time": "2026-09-02 12:30"}, {"x": 71.2, "y": -0.30111058970748544, "time": "2026-09-02 12:40"}, {"x": 72.2, "y": -0.2919860263830243, "time": "2026-09-02 12:50"}, {"x": 73.2, "y": -0.3232702434954922, "time": "2026-09-02 13:00"}, {"x": 74.2, "y": -0.333698315866305, "time": "2026-09-02 13:10"}, {"x": 75.2, "y": -0.31935971635642263, "time": "2026-09-02 13:20"}, {"x": 76.2, "y": -0.3519474425152422, "time": "2026-09-02 13:30"}, {"x": 77.2, "y": -0.28286146305854826, "time": "2026-09-02 13:40"}, {"x": 78.2, "y": -0.25809479117785317, "time": "2026-09-02 13:50"}, {"x": 79.2, "y": -0.2711298816413691, "time": "2026-09-02 14:00"}, {"x": 80.2, "y": -0.20334741123102681, "time": "2026-09-02 14:10"}, {"x": 81.2, "y": -0.23984566452890116, "time": "2026-09-02 14:20"}, {"x": 82.2, "y": -0.3063246258929067, "time": "2026-09-02 14:30"}, {"x": 83.2, "y": -0.2985035716147823, "time": "2026-09-02 14:40"}, {"x": 84.2, "y": -0.3063246258929067, "time": "2026-09-02 14:50"}, {"x": 85.2, "y": -0.2541842640387836, "time": "2026-09-02 15:00"}, {"x": 86.2, "y": -0.2281140831117368, "time": "2026-09-02 15:10"}, {"x": 87.2, "y": -0.21898951978726078, "time": "2026-09-02 15:20"}, {"x": 88.2, "y": -0.2711298816413691, "time": "2026-09-02 15:30"}, {"x": 89.2, "y": -0.2326763647739674, "time": "2026-09-02 15:40"}, {"x": 90.2, "y": -0.26330882736325956, "time": "2026-09-02 15:50"}, {"x": 91.2, "y": -0.23211585588404304, "time": "2026-09-02 16:00"}]}, {"ticker": "QQQ", "color": "#7c3aed", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-31 15:50"}, {"x": 1.0, "y": 0.037656903765687845, "time": "2026-08-31 15:51"}, {"x": 2.0, "y": 0.05090655509065678, "time": "2026-08-31 15:52"}, {"x": 3.0, "y": 0.016736401673640804, "time": "2026-08-31 15:53"}, {"x": 4.0, "y": 0.03068340306834411, "time": "2026-08-31 15:54"}, {"x": 5.0, "y": -0.03207810320781286, "time": "2026-08-31 15:55"}, {"x": 6.0, "y": 0.0, "time": "2026-08-31 15:56"}, {"x": 7.0, "y": -0.02092050209204704, "time": "2026-08-31 15:57"}, {"x": 8.0, "y": -0.015341701534172055, "time": "2026-08-31 15:58"}, {"x": 9.0, "y": -0.025104602510453277, "time": "2026-08-31 15:59"}, {"x": 10.0, "y": 0.0013947001394687454, "time": "2026-08-31 16:00"}, {"x": 11.6, "y": -1.4797768479776867, "time": "2026-09-01 09:30"}, {"x": 12.6, "y": -1.2370990237099029, "time": "2026-09-01 09:40"}, {"x": 13.6, "y": -1.3633193863319355, "time": "2026-09-01 09:50"}, {"x": 14.6, "y": -1.2076429567643014, "time": "2026-09-01 10:00"}, {"x": 15.6, "y": -1.2357043235704344, "time": "2026-09-01 10:10"}, {"x": 16.6, "y": -1.1701534170153398, "time": "2026-09-01 10:20"}, {"x": 17.6, "y": -1.020920502092057, "time": "2026-09-01 10:30"}, {"x": 18.6, "y": -0.893793584379359, "time": "2026-09-01 10:40"}, {"x": 19.6, "y": -0.9511854951185564, "time": "2026-09-01 10:50"}, {"x": 20.6, "y": -1.1129707112970737, "time": "2026-09-01 11:00"}, {"x": 21.6, "y": -1.0571827057182763, "time": "2026-09-01 11:10"}, {"x": 22.6, "y": -0.9428172942817281, "time": "2026-09-01 11:20"}, {"x": 23.6, "y": -0.8252161785216132, "time": "2026-09-01 11:30"}, {"x": 24.6, "y": -0.6708507670850691, "time": "2026-09-01 11:40"}, {"x": 25.6, "y": -0.7238493723849448, "time": "2026-09-01 11:50"}, {"x": 26.6, "y": -0.849372384937243, "time": "2026-09-01 12:00"}, {"x": 27.6, "y": -1.0320781032078072, "time": "2026-09-01 12:10"}, {"x": 28.6, "y": -1.11715481171548, "time": "2026-09-01 12:20"}, {"x": 29.6, "y": -1.1673640167364023, "time": "2026-09-01 12:30"}, {"x": 30.6, "y": -1.1757322175732148, "time": "2026-09-01 12:40"}, {"x": 31.6, "y": -1.0739191073919172, "time": "2026-09-01 12:50"}, {"x": 32.6, "y": -1.2198047419804716, "time": "2026-09-01 13:00"}, {"x": 33.6, "y": -1.2468619246862, "time": "2026-09-01 13:10"}, {"x": 34.6, "y": -1.2454672245467155, "time": "2026-09-01 13:20"}, {"x": 35.6, "y": -1.2447698744769813, "time": "2026-09-01 13:30"}, {"x": 36.6, "y": -1.3104771269177118, "time": "2026-09-01 13:40"}, {"x": 37.6, "y": -1.252440725244075, "time": "2026-09-01 13:50"}, {"x": 38.6, "y": -1.3152022315202163, "time": "2026-09-01 14:00"}, {"x": 39.6, "y": -1.3500697350069666, "time": "2026-09-01 14:10"}, {"x": 40.6, "y": -1.411436541143655, "time": "2026-09-01 14:20"}, {"x": 41.6, "y": -1.525801952580203, "time": "2026-09-01 14:30"}, {"x": 42.6, "y": -1.5857740585774063, "time": "2026-09-01 14:40"}, {"x": 43.6, "y": -1.475146443514651, "time": "2026-09-01 14:50"}, {"x": 44.6, "y": -1.3835425383542481, "time": "2026-09-01 15:00"}, {"x": 45.6, "y": -1.3389121338912167, "time": "2026-09-01 15:10"}, {"x": 46.6, "y": -1.3040446304044662, "time": "2026-09-01 15:20"}, {"x": 47.6, "y": -1.3807531380753106, "time": "2026-09-01 15:30"}, {"x": 48.6, "y": -1.284518828451888, "time": "2026-09-01 15:40"}, {"x": 49.6, "y": -1.3012552301255287, "time": "2026-09-01 15:50"}, {"x": 50.6, "y": -1.2942817294281692, "time": "2026-09-01 16:00"}, {"x": 52.2, "y": -1.425383542538358, "time": "2026-09-02 09:30"}, {"x": 53.2, "y": -1.552301255230125, "time": "2026-09-02 09:40"}, {"x": 54.2, "y": -1.509065550906562, "time": "2026-09-02 09:50"}, {"x": 55.2, "y": -1.3904881450488094, "time": "2026-09-02 10:00"}, {"x": 56.2, "y": -1.1771269177126995, "time": "2026-09-02 10:10"}, {"x": 57.2, "y": -1.0878661087866046, "time": "2026-09-02 10:20"}, {"x": 58.2, "y": -1.0868758716875915, "time": "2026-09-02 10:30"}, {"x": 59.2, "y": -1.1729428172942773, "time": "2026-09-02 10:40"}, {"x": 60.2, "y": -1.3110181311018099, "time": "2026-09-02 10:50"}, {"x": 61.2, "y": -1.1966527196652776, "time": "2026-09-02 11:00"}, {"x": 62.2, "y": -1.0934449093444953, "time": "2026-09-02 11:10"}, {"x": 63.2, "y": -1.0264993026499323, "time": "2026-09-02 11:20"}, {"x": 64.2, "y": -1.1157601115760112, "time": "2026-09-02 11:30"}, {"x": 65.2, "y": -1.2357043235704344, "time": "2026-09-02 11:40"}, {"x": 66.2, "y": -1.0885634588563389, "time": "2026-09-02 11:50"}, {"x": 67.2, "y": -1.0822873082287294, "time": "2026-09-02 12:00"}, {"x": 68.2, "y": -1.1429567642956833, "time": "2026-09-02 12:10"}, {"x": 69.2, "y": -1.2015341701534181, "time": "2026-09-02 12:20"}, {"x": 70.2, "y": -1.1854951185495117, "time": "2026-09-02 12:30"}, {"x": 71.2, "y": -1.2203626220362622, "time": "2026-09-02 12:40"}, {"x": 72.2, "y": -1.1966527196652776, "time": "2026-09-02 12:50"}, {"x": 73.2, "y": -1.2775453277545283, "time": "2026-09-02 13:00"}, {"x": 74.2, "y": -1.2747559274755909, "time": "2026-09-02 13:10"}, {"x": 75.2, "y": -1.210599721059965, "time": "2026-09-02 13:20"}, {"x": 76.2, "y": -1.261506276150622, "time": "2026-09-02 13:30"}, {"x": 77.2, "y": -1.1813110181311057, "time": "2026-09-02 13:40"}, {"x": 78.2, "y": -1.1799163179916368, "time": "2026-09-02 13:50"}, {"x": 79.2, "y": -1.2092050209204963, "time": "2026-09-02 14:00"}, {"x": 80.2, "y": -1.1366806136680583, "time": "2026-09-02 14:10"}, {"x": 81.2, "y": -1.1813110181311057, "time": "2026-09-02 14:20"}, {"x": 82.2, "y": -1.238507670850763, "time": "2026-09-02 14:30"}, {"x": 83.2, "y": -1.2119944211994498, "time": "2026-09-02 14:40"}, {"x": 84.2, "y": -1.2259414225941372, "time": "2026-09-02 14:50"}, {"x": 85.2, "y": -1.1576011157601052, "time": "2026-09-02 15:00"}, {"x": 86.2, "y": -1.1450488145048865, "time": "2026-09-02 15:10"}, {"x": 87.2, "y": -1.1506276150627615, "time": "2026-09-02 15:20"}, {"x": 88.2, "y": -1.1715481171548086, "time": "2026-09-02 15:30"}, {"x": 89.2, "y": -1.100418410041839, "time": "2026-09-02 15:40"}, {"x": 90.2, "y": -1.080892608089261, "time": "2026-09-02 15:50"}, {"x": 91.2, "y": -1.048814504881448, "time": "2026-09-02 16:00"}]}, {"ticker": "IWM", "color": "#ea580c", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-31 15:50"}, {"x": 1.0, "y": 0.047589910938876316, "time": "2026-08-31 15:51"}, {"x": 2.0, "y": 0.047589910938876316, "time": "2026-08-31 15:52"}, {"x": 3.0, "y": -0.0135971174111158, "time": "2026-08-31 15:53"}, {"x": 4.0, "y": -0.010197838058341681, "time": "2026-08-31 15:54"}, {"x": 5.0, "y": -0.061187028349992116, "time": "2026-08-31 15:55"}, {"x": 6.0, "y": -0.061187028349992116, "time": "2026-08-31 15:56"}, {"x": 7.0, "y": -0.0780134611462472, "time": "2026-08-31 15:57"}, {"x": 8.0, "y": -0.07648378543749498, "time": "2026-08-31 15:58"}, {"x": 9.0, "y": -0.09178054252497853, "time": "2026-08-31 15:59"}, {"x": 10.0, "y": -0.040791352233328075, "time": "2026-08-31 16:00"}, {"x": 11.6, "y": -0.8668162349581928, "time": "2026-09-01 09:30"}, {"x": 12.6, "y": -0.8668162349581928, "time": "2026-09-01 09:40"}, {"x": 13.6, "y": -0.9008090284859726, "time": "2026-09-01 09:50"}, {"x": 14.6, "y": -0.8022299272554264, "time": "2026-09-01 10:00"}, {"x": 15.6, "y": -0.734244340199886, "time": "2026-09-01 10:10"}, {"x": 16.6, "y": -0.6458630770276818, "time": "2026-09-01 10:20"}, {"x": 17.6, "y": -0.5778774899721221, "time": "2026-09-01 10:30"}, {"x": 18.6, "y": -0.6220681215582242, "time": "2026-09-01 10:40"}, {"x": 19.6, "y": -0.693452987966558, "time": "2026-09-01 10:50"}, {"x": 20.6, "y": -0.7580392956693243, "time": "2026-09-01 11:00"}, {"x": 21.6, "y": -0.7682371337276467, "time": "2026-09-01 11:10"}, {"x": 22.6, "y": -0.7274117887007994, "time": "2026-09-01 11:20"}, {"x": 23.6, "y": -0.7376436195526602, "time": "2026-09-01 11:30"}, {"x": 24.6, "y": -0.6322659596165658, "time": "2026-09-01 11:40"}, {"x": 25.6, "y": -0.730845060847112, "time": "2026-09-01 11:50"}, {"x": 26.6, "y": -0.8022299272554264, "time": "2026-09-01 12:00"}, {"x": 27.6, "y": -0.9399007410428941, "time": "2026-09-01 12:10"}, {"x": 28.6, "y": -1.1353593038275993, "time": "2026-09-01 12:20"}, {"x": 29.6, "y": -1.1438575022095345, "time": "2026-09-01 12:30"}, {"x": 30.6, "y": -1.1472567815623087, "time": "2026-09-01 12:40"}, {"x": 31.6, "y": -1.1047657896525935, "time": "2026-09-01 12:50"}, {"x": 32.6, "y": -1.159120266503499, "time": "2026-09-01 13:00"}, {"x": 33.6, "y": -1.1387585831803735, "time": "2026-09-01 13:10"}, {"x": 34.6, "y": -1.1387585831803735, "time": "2026-09-01 13:20"}, {"x": 35.6, "y": -1.1625535386498116, "time": "2026-09-01 13:30"}, {"x": 36.6, "y": -1.1557549799442635, "time": "2026-09-01 13:40"}, {"x": 37.6, "y": -1.1846488544428628, "time": "2026-09-01 13:50"}, {"x": 38.6, "y": -1.1999456115303655, "time": "2026-09-01 14:00"}, {"x": 39.6, "y": -1.1965463321775722, "time": "2026-09-01 14:10"}, {"x": 40.6, "y": -1.2356380447345132, "time": "2026-09-01 14:20"}, {"x": 41.6, "y": -1.2815283159970023, "time": "2026-09-01 14:30"}, {"x": 42.6, "y": -1.3461146236997688, "time": "2026-09-01 14:40"}, {"x": 43.6, "y": -1.2730301176150671, "time": "2026-09-01 14:50"}, {"x": 44.6, "y": -1.2577333605275642, "time": "2026-09-01 15:00"}, {"x": 45.6, "y": -1.1625535386498116, "time": "2026-09-01 15:10"}, {"x": 46.6, "y": -1.1897477734720239, "time": "2026-09-01 15:20"}, {"x": 47.6, "y": -1.315521109524782, "time": "2026-09-01 15:30"}, {"x": 48.6, "y": -1.2781290366442284, "time": "2026-09-01 15:40"}, {"x": 49.6, "y": -1.2169420082942362, "time": "2026-09-01 15:50"}, {"x": 50.6, "y": -1.2577333605275642, "time": "2026-09-01 16:00"}, {"x": 52.2, "y": -0.5540825345026839, "time": "2026-09-02 09:30"}, {"x": 53.2, "y": -0.5778774899721221, "time": "2026-09-02 09:40"}, {"x": 54.2, "y": -0.6220681215582242, "time": "2026-09-02 09:50"}, {"x": 55.2, "y": -0.3705214494527268, "time": "2026-09-02 10:00"}, {"x": 56.2, "y": -0.18356108504997637, "time": "2026-09-02 10:10"}, {"x": 57.2, "y": -0.2719423482221808, "time": "2026-09-02 10:20"}, {"x": 58.2, "y": -0.1733632469916347, "time": "2026-09-02 10:30"}, {"x": 59.2, "y": -0.28214018628050314, "time": "2026-09-02 10:40"}, {"x": 60.2, "y": -0.3501257733360628, "time": "2026-09-02 10:50"}, {"x": 61.2, "y": -0.4894962267999176, "time": "2026-09-02 11:00"}, {"x": 62.2, "y": -0.4385070365082672, "time": "2026-09-02 11:10"}, {"x": 63.2, "y": -0.5030933442110334, "time": "2026-09-02 11:20"}, {"x": 64.2, "y": -0.45380379359575074, "time": "2026-09-02 11:30"}, {"x": 65.2, "y": -0.4487048745665896, "time": "2026-09-02 11:40"}, {"x": 66.2, "y": -0.3501257733360628, "time": "2026-09-02 11:50"}, {"x": 67.2, "y": -0.3705214494527268, "time": "2026-09-02 12:00"}, {"x": 68.2, "y": -0.3603236113943851, "time": "2026-09-02 12:10"}, {"x": 69.2, "y": -0.4419063158610413, "time": "2026-09-02 12:20"}, {"x": 70.2, "y": -0.3603236113943851, "time": "2026-09-02 12:30"}, {"x": 71.2, "y": -0.3977156842749391, "time": "2026-09-02 12:40"}, {"x": 72.2, "y": -0.3450268543068823, "time": "2026-09-02 12:50"}, {"x": 73.2, "y": -0.2855394656332966, "time": "2026-09-02 13:00"}, {"x": 74.2, "y": -0.3195322591610571, "time": "2026-09-02 13:10"}, {"x": 75.2, "y": -0.33312937657217284, "time": "2026-09-02 13:20"}, {"x": 76.2, "y": -0.3297300972193988, "time": "2026-09-02 13:30"}, {"x": 77.2, "y": -0.23285063566523975, "time": "2026-09-02 13:40"}, {"x": 78.2, "y": -0.2090556801958016, "time": "2026-09-02 13:50"}, {"x": 79.2, "y": -0.1648650486096994, "time": "2026-09-02 14:00"}, {"x": 80.2, "y": -0.10877693928886845, "time": "2026-09-02 14:10"}, {"x": 81.2, "y": -0.11217621864164255, "time": "2026-09-02 14:20"}, {"x": 82.2, "y": -0.13257189475830658, "time": "2026-09-02 14:30"}, {"x": 83.2, "y": -0.07818342511388204, "time": "2026-09-02 14:40"}, {"x": 84.2, "y": -0.06798558705554036, "time": "2026-09-02 14:50"}, {"x": 85.2, "y": -0.0033992793527741192, "time": "2026-09-02 15:00"}, {"x": 86.2, "y": -0.0067985587055482384, "time": "2026-09-02 15:10"}, {"x": 87.2, "y": -0.040791352233328075, "time": "2026-09-02 15:20"}, {"x": 88.2, "y": -0.0356924332041669, "time": "2026-09-02 15:30"}, {"x": 89.2, "y": 0.0305935141749864, "time": "2026-09-02 15:40"}, {"x": 90.2, "y": -0.057787748997217996, "time": "2026-09-02 15:50"}, {"x": 91.2, "y": -0.06458630770276623, "time": "2026-09-02 16:00"}]}], "frames": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.6, 12.6, 13.6, 14.6, 15.6, 16.6, 17.6, 18.6, 19.6, 20.6, 21.6, 22.6, 23.6, 24.6, 25.6, 26.6, 27.6, 28.6, 29.6, 30.6, 31.6, 32.6, 33.6, 34.6, 35.6, 36.6, 37.6, 38.6, 39.6, 40.6, 41.6, 42.6, 43.6, 44.6, 45.6, 46.6, 47.6, 48.6, 49.6, 50.6, 52.2, 53.2, 54.2, 55.2, 56.2, 57.2, 58.2, 59.2, 60.2, 61.2, 62.2, 63.2, 64.2, 65.2, 66.2, 67.2, 68.2, 69.2, 70.2, 71.2, 72.2, 73.2, 74.2, 75.2, 76.2, 77.2, 78.2, 79.2, 80.2, 81.2, 82.2, 83.2, 84.2, 85.2, 86.2, 87.2, 88.2, 89.2, 90.2, 91.2], "sessions": [{"start": -0.5, "end": 10.5, "label": "Mon Aug 31 (T0)"}, {"start": 11.1, "end": 51.1, "label": "Tue Sep 01, 2026 (T1)"}, {"start": 51.7, "end": 91.7, "label": "Wed Sep 02, 2026 (T2)"}, {"start": 92.3, "end": 132.3, "label": "Thu Sep 03, 2026 (T3)"}], "xMin": -0.5, "xMax": 91.7, "yMin": -14.509303868392763, "yMax": 5.9713584127295825};
+        const individualCharts = [{"ticker": "SNDK", "src": "meta data/2_SNDK Chart 10m 31 August-03 Sep 2026 085117.png?v=1788439885"}, {"ticker": "NOW", "src": "meta data/2_NOW Chart 10m 31 August-03 Sep 2026 085117.png?v=1788439886"}, {"ticker": "CRWD", "src": "meta data/2_CRWD Chart 10m 31 August-03 Sep 2026 085117.png?v=1788439888"}];
+        const liveSnapshotPayload = {"entry_date": "2026-08-31", "end_date": "2026-09-03", "deployed_capital": 250000.0, "positions": {"CRWD": {"entry_price": 232.2851, "shares": 358.75453627173385}, "NOW": {"entry_price": 148.85, "shares": 559.8477214197738}, "SNDK": {"entry_price": 1527.15, "shares": 54.56787698217813}}};
+        const reportNoteStorageKey = "duo-report-note:Thu 03 Sep 2026 Runs:Dashboard 31 Aug-03 Sep 2026 085117.html";
+        const reportNotePath = "Thu 03 Sep 2026 Runs/meta data/Dashboard 31 Aug-03 Sep 2026 085117 Notes.txt";
+        const portfolioSubTabIds = new Set(['screened', 'portfolio', 'all-stocks', 'individual']);
+        let currentPortfolioSubTabId = 'screened';
+        const allStocksReplayState = {
+            frameIndex: 0,
+            playing: false,
+            timer: null,
+            initialized: false
+        };
+
+        function goToAppRoute(path) {
+            const route = path || '/';
+            if (window.location.protocol === 'file:') {
+                window.location.href = `http://127.0.0.1:8765${route}`;
+                return;
+            }
+            window.location.href = route;
+        }
+        function setPortfolioSubtabsVisible(visible) {
+            const subtabs = document.getElementById('portfolioSubtabs');
+            if (subtabs) {
+                subtabs.classList.toggle('hidden', !visible);
+            }
+        }
+        function activatePanel(id) {
+            document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+            const panel = document.getElementById(id);
+            if (panel) {
+                panel.classList.add('active');
+            }
+        }
+        function showPortfolioSubTab(id, button) {
+            if (!portfolioSubTabIds.has(id)) {
+                id = 'screened';
+            }
+            currentPortfolioSubTabId = id;
+            activatePanel(id);
+            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.portfolio-subtabs button').forEach(tab => tab.classList.remove('active'));
+            const portfolioTab = document.querySelector('.tabs button[data-main-tab="portfolio"]');
+            if (portfolioTab) {
+                portfolioTab.classList.add('active');
+            }
+            if (button) {
+                button.classList.add('active');
+            }
+            setPortfolioSubtabsVisible(true);
+            window.scrollTo(0, 0);
+        }
+        function showMainReportTab(id, button) {
+            activatePanel(id);
+            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.portfolio-subtabs button').forEach(tab => tab.classList.remove('active'));
+            if (button) {
+                button.classList.add('active');
+            }
+            setPortfolioSubtabsVisible(false);
+            window.scrollTo(0, 0);
+        }
+        function showStockChart(index, button) {
+            const chart = individualCharts[index];
+            if (!chart) {
+                return;
+            }
+            const image = document.getElementById('selectedStockChart');
+            image.src = chart.src;
+            image.alt = `${chart.ticker} chart`;
+            document.querySelectorAll('.stock-picker button').forEach(tab => tab.classList.remove('active'));
+            button.classList.add('active');
+            window.scrollTo(0, 0);
+        }
+        function updateLiveClock() {
+            const now = new Date();
+            document.getElementById('liveClockDate').firstChild.nodeValue = now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
+            document.getElementById('liveClockTime').textContent = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function screenSimChartTickers() {
+            return individualCharts.map(chart => chart.ticker).filter(Boolean);
+        }
+
+        function screenSimChartPopoutUrl(ticker, anchorDate = '', forward = false, tickersOverride = null) {
+            const chartBaseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765/chart-popout' : '/chart-popout';
+            const params = new URLSearchParams();
+            params.set('ticker', ticker);
+            if (anchorDate) {
+                params.set('anchor', anchorDate);
+            }
+            const tickers = Array.isArray(tickersOverride) ? tickersOverride : screenSimChartTickers();
+            if (tickers.length) {
+                params.set('tickers', tickers.join(','));
+            }
+            if (forward) {
+                params.set('forward', '1');
+            }
+            return `${chartBaseUrl}?${params.toString()}`;
+        }
+
+        function openTickerChart(ticker, anchorDate = '') {
+            window.open(screenSimChartPopoutUrl(ticker, anchorDate), '_blank', 'width=1800,height=1060,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+        }
+
+        function closeTickerChart() {
+            const modal = document.getElementById('tickerChartModal');
+            const image = document.getElementById('tickerChartImage');
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            image.removeAttribute('src');
+        }
+
+        function compareSelectedStockSortValues(aValue, bValue, direction) {
+            const aEmpty = aValue === null || aValue === undefined || String(aValue).trim() === '';
+            const bEmpty = bValue === null || bValue === undefined || String(bValue).trim() === '';
+            if (aEmpty || bEmpty) {
+                if (aEmpty && bEmpty) {
+                    return 0;
+                }
+                return aEmpty ? 1 : -1;
+            }
+            const aNumber = Number(aValue);
+            const bNumber = Number(bValue);
+            if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+                return (aNumber - bNumber) * direction;
+            }
+            return String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+        }
+
+        function sortSelectedStocksTable(header) {
+            const table = header.closest('table');
+            const tbody = table ? table.querySelector('tbody') : null;
+            if (!tbody) {
+                return;
+            }
+            const headers = [...table.querySelectorAll('th[data-sort-key]')];
+            const columnIndex = headers.indexOf(header);
+            if (columnIndex < 0) {
+                return;
+            }
+            const nextDirection = header.classList.contains('sort-asc') ? 'desc' : 'asc';
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                th.setAttribute('aria-sort', 'none');
+            });
+            header.classList.add(nextDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            header.setAttribute('aria-sort', nextDirection === 'asc' ? 'ascending' : 'descending');
+            const direction = nextDirection === 'asc' ? 1 : -1;
+            const rows = [...tbody.querySelectorAll('tr')];
+            rows.sort((a, b) => {
+                const aValue = a.children[columnIndex]?.getAttribute('data-sort-value') ?? a.children[columnIndex]?.textContent ?? '';
+                const bValue = b.children[columnIndex]?.getAttribute('data-sort-value') ?? b.children[columnIndex]?.textContent ?? '';
+                const result = compareSelectedStockSortValues(aValue, bValue, direction);
+                if (result !== 0) {
+                    return result;
+                }
+                return String(a.children[0]?.textContent || '').localeCompare(String(b.children[0]?.textContent || ''), undefined, { numeric: true, sensitivity: 'base' });
+            });
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function initSelectedStocksNotes() {
+            const note = document.getElementById('selectedStocksNote');
+            const status = document.getElementById('selectedStocksNoteStatus');
+            if (!note || !status) {
+                return;
+            }
+            const fallbackNote = window.localStorage ? (localStorage.getItem(reportNoteStorageKey) || '') : '';
+            note.value = fallbackNote;
+            const canUseServerNotes = Boolean(reportNotePath) && window.location.protocol !== 'file:';
+            if (canUseServerNotes) {
+                fetch(`/report-note?path=${encodeURIComponent(reportNotePath)}`, { cache: 'no-store' })
+                    .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('Unable to load note')))
+                    .then(data => {
+                        const serverNote = String(data.note || '');
+                        note.value = serverNote || fallbackNote;
+                        status.textContent = 'Saved to report folder';
+                        if (!serverNote && fallbackNote) {
+                            return fetch('/report-note', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: reportNotePath, note: fallbackNote })
+                            });
+                        }
+                    })
+                    .catch(() => {
+                        status.textContent = 'Autosaved in this browser';
+                    });
+            }
+            let noteSaveTimer = null;
+            note.addEventListener('input', () => {
+                status.textContent = 'Saving...';
+                if (noteSaveTimer) {
+                    clearTimeout(noteSaveTimer);
+                }
+                noteSaveTimer = setTimeout(() => {
+                    if (canUseServerNotes) {
+                        fetch('/report-note', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: reportNotePath, note: note.value })
+                        })
+                            .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('Unable to save note')))
+                            .then(() => {
+                                if (window.localStorage) {
+                                    localStorage.removeItem(reportNoteStorageKey);
+                                }
+                                status.textContent = 'Saved to report folder';
+                            })
+                            .catch(() => {
+                                if (window.localStorage) {
+                                    localStorage.setItem(reportNoteStorageKey, note.value);
+                                }
+                                status.textContent = 'Saved in this browser only';
+                            });
+                        return;
+                    }
+                    if (window.localStorage) {
+                        localStorage.setItem(reportNoteStorageKey, note.value);
+                    }
+                    status.textContent = 'Saved in this browser only';
+                }, 250);
+            });
+        }
+
+        function startLiveRefreshCountdown() {
+            const countdown = document.getElementById('liveRefreshCountdown');
+            const banner = document.getElementById('liveRefreshBanner');
+            const snapshot = document.getElementById('liveRefreshSnapshot');
+            if (!countdown || !banner || !snapshot) {
+                return;
+            }
+            function secondsUntilNextBarCheck() {
+                const now = new Date();
+                return Math.max(1, 63 - now.getSeconds());
+            }
+            let remaining = secondsUntilNextBarCheck();
+            countdown.textContent = String(remaining);
+            let refreshing = false;
+            function renderSnapshot(data) {
+                if (!data.active) {
+                    banner.classList.remove('active');
+                    return false;
+                }
+                banner.classList.add('active');
+                const pnl = Number(data.pnl_pct || 0);
+                const sign = pnl >= 0 ? '+' : '';
+                banner.firstChild.nodeValue = `Live ${data.session} 1-min close: next update in `;
+                snapshot.textContent = ` · ${data.timestamp || '--:--'} close · Portfolio ${sign}${pnl.toFixed(2)}%`;
+                return true;
+            }
+            function requestSnapshot() {
+                refreshing = true;
+                const liveSnapshotUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765/live-snapshot' : '/live-snapshot';
+                fetch(liveSnapshotUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(liveSnapshotPayload),
+                    cache: 'no-store'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Snapshot failed: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        const isActive = renderSnapshot(data);
+                        remaining = secondsUntilNextBarCheck();
+                        countdown.textContent = String(remaining);
+                        refreshing = false;
+                    })
+                    .catch(() => {
+                        banner.classList.remove('active');
+                        refreshing = false;
+                    });
+            }
+            requestSnapshot();
+            setInterval(() => {
+                if (refreshing) {
+                    return;
+                }
+                remaining -= 1;
+                if (remaining > 0) {
+                    countdown.textContent = String(remaining);
+                    return;
+                }
+                requestSnapshot();
+            }, 1000);
+        }
+
+        function svgEl(name, attrs = {}) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', name);
+            Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+            return el;
+        }
+
+        function darkenHexColor(hexColor, amount = 0.20) {
+            const raw = hexColor.replace('#', '');
+            const red = Math.round(parseInt(raw.slice(0, 2), 16) * (1 - amount));
+            const green = Math.round(parseInt(raw.slice(2, 4), 16) * (1 - amount));
+            const blue = Math.round(parseInt(raw.slice(4, 6), 16) * (1 - amount));
+            return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
+        }
+
+        function allStocksReplayScales(width, height) {
+            const margin = { left: 90, right: 330, top: 72, bottom: 108 };
+            const plotWidth = Math.max(width - margin.left - margin.right, 1);
+            const plotHeight = Math.max(height - margin.top - margin.bottom, 1);
+            const xSpan = Math.max(allStocksReplayData.xMax - allStocksReplayData.xMin, 1);
+            const ySpan = Math.max(allStocksReplayData.yMax - allStocksReplayData.yMin, 1);
+            return {
+                margin,
+                plotWidth,
+                plotHeight,
+                x: value => margin.left + ((value - allStocksReplayData.xMin) / xSpan) * plotWidth,
+                y: value => margin.top + plotHeight - ((value - allStocksReplayData.yMin) / ySpan) * plotHeight
+            };
+        }
+
+        function drawAllStocksReplayBase(svg, width, height, scales, currentMetrics) {
+            svg.innerHTML = '';
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.appendChild(svgEl('rect', { x: 0, y: 0, width, height, fill: '#ffffff', rx: 8 }));
+            svg.appendChild(svgEl('rect', { x: 0, y: scales.margin.top, width: scales.margin.left, height: scales.plotHeight, fill: '#ffffff' }));
+            svg.appendChild(svgEl('rect', { x: scales.margin.left, y: height - scales.margin.bottom, width: scales.plotWidth, height: scales.margin.bottom, fill: '#ffffff' }));
+
+            allStocksReplayData.sessions.forEach((session, idx) => {
+                const startX = scales.x(session.start);
+                const endX = scales.x(session.end);
+                svg.appendChild(svgEl('rect', { x: startX, y: 28, width: Math.max(endX - startX, 1), height: 28, fill: '#353945' }));
+                const text = svgEl('text', { x: (startX + endX) / 2, y: 47, fill: '#ffffff', 'font-size': idx === 0 ? 11 : 14, 'font-weight': 800, 'text-anchor': 'middle' });
+                text.textContent = session.label;
+                svg.appendChild(text);
+                svg.appendChild(svgEl('text', { x: startX + 4, y: 74, fill: '#353945', 'font-size': 16, 'font-weight': 800 })).textContent = '☼';
+                svg.appendChild(svgEl('circle', { cx: endX - 10, cy: 70, r: 4.4, fill: '#ffffff', stroke: '#353945', 'stroke-width': 2 }));
+                if (idx > 0) {
+                    svg.appendChild(svgEl('line', { x1: startX, x2: startX, y1: 28, y2: height - scales.margin.bottom, stroke: '#a3a8b9', 'stroke-width': 2.4, opacity: 0.95 }));
+                }
+            });
+
+            const yStep = 2;
+            const firstTick = Math.ceil(allStocksReplayData.yMin / yStep) * yStep;
+            for (let yValue = firstTick; yValue <= allStocksReplayData.yMax; yValue += yStep) {
+                const y = scales.y(yValue);
+                svg.appendChild(svgEl('line', { x1: scales.margin.left, x2: width - scales.margin.right, y1: y, y2: y, stroke: '#dedfe5', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
+                const label = svgEl('text', { x: scales.margin.left - 12, y: y + 4, fill: '#353945', 'font-size': 14, 'font-weight': 700, 'text-anchor': 'end' });
+                label.textContent = `${yValue.toFixed(0)}%`;
+                svg.appendChild(label);
+            }
+
+            const zeroY = scales.y(0);
+            svg.appendChild(svgEl('line', { x1: scales.margin.left, x2: width - scales.margin.right, y1: zeroY, y2: zeroY, stroke: '#868ea5', 'stroke-width': 1.2, 'stroke-dasharray': '5 4' }));
+            svg.appendChild(svgEl('rect', { x: scales.margin.left, y: scales.margin.top, width: scales.plotWidth, height: scales.plotHeight, fill: 'none', stroke: '#dedfe5' }));
+
+            allStocksReplayData.sessions.forEach(session => {
+                const labelTimes = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
+                const points = allStocksReplayData.series.length ? allStocksReplayData.series[0].points : [];
+                labelTimes.forEach(labelTime => {
+                    const point = points.find(item => item.time && item.time.endsWith(labelTime) && item.x >= session.start && item.x <= session.end);
+                    if (!point) {
+                        return;
+                    }
+                    const tickX = scales.x(point.x);
+                    const tick = svgEl('text', { x: tickX, y: height - 28, fill: '#353945', 'font-size': 11, 'font-weight': 700, 'text-anchor': 'end', transform: `rotate(-45 ${tickX} ${height - 28})` });
+                    tick.textContent = labelTime;
+                    svg.appendChild(tick);
+                });
+            });
+
+            const axisLabelX = 30;
+            const axisLabelY = scales.margin.top + scales.plotHeight / 2;
+            svg.appendChild(svgEl('rect', { x: axisLabelX - 10, y: axisLabelY - 92, width: 23, height: 184, rx: 4, fill: '#ffffff', stroke: '#353945', 'stroke-width': 1 }));
+            const axisText = svgEl('text', { x: axisLabelX + 6, y: axisLabelY, fill: '#353945', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle', transform: `rotate(-90 ${axisLabelX + 6} ${axisLabelY})` });
+            axisText.textContent = 'ALL STOCKS PLOTTING (%)';
+            svg.appendChild(axisText);
+
+            const tableX = width - 275;
+            const tableY = 62;
+            const tableW = 220;
+            const rowGap = 25;
+            const metrics = currentMetrics
+                .filter(metric => !metric.benchmark)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 22);
+            const tableH = Math.max(118, 58 + metrics.length * rowGap + 18);
+            const tRange = allStocksReplayData.sessions.length ? `T0 - T${allStocksReplayData.sessions.length - 1}` : 'T0';
+            const header = svgEl('text', { x: tableX + tableW / 2, y: 34, fill: '#22262f', 'font-size': 14, 'font-weight': 800, 'text-anchor': 'middle' });
+            header.textContent = `Stock Performance (${tRange})`;
+            svg.appendChild(header);
+            svg.appendChild(svgEl('rect', { x: tableX, y: tableY, width: tableW, height: tableH, rx: 4, fill: '#ffffff', stroke: '#dedfe5', 'stroke-width': 1.4 }));
+            const tableTitle = svgEl('text', { x: tableX + 46, y: tableY + 32, fill: '#22262f', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle' });
+            tableTitle.textContent = 'Ticker';
+            svg.appendChild(tableTitle);
+            const valueTitle = svgEl('text', { x: tableX + tableW - 38, y: tableY + 32, fill: '#22262f', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle' });
+            valueTitle.textContent = 'P&L (%)';
+            svg.appendChild(valueTitle);
+
+            metrics.forEach((metric, idx) => {
+                const rowY = tableY + 58 + idx * rowGap;
+                const valueColor = metric.value >= 0 ? '#00a449' : '#d91e2b';
+                svg.appendChild(svgEl('line', { x1: tableX + 10, x2: tableX + tableW - 10, y1: rowY + 9, y2: rowY + 9, stroke: '#dedfe5', 'stroke-width': 0.9 }));
+                const tickerText = svgEl('text', { x: tableX + 34, y: rowY, fill: '#22262f', 'font-size': 13, 'font-weight': 700, 'text-anchor': 'start' });
+                tickerText.textContent = metric.ticker;
+                svg.appendChild(tickerText);
+                const valueText = svgEl('text', { x: tableX + tableW - 30, y: rowY, fill: valueColor, 'font-size': 15, 'font-weight': 800, 'text-anchor': 'end' });
+                valueText.textContent = `${metric.value >= 0 ? '+' : ''}${metric.value.toFixed(2)}%`;
+                svg.appendChild(valueText);
+            });
+
+            const benchmarkMetrics = currentMetrics
+                .filter(metric => metric.benchmark)
+                .sort((a, b) => ['SPY', 'QQQ', 'IWM'].indexOf(a.ticker) - ['SPY', 'QQQ', 'IWM'].indexOf(b.ticker));
+            if (benchmarkMetrics.length) {
+                const benchY = tableY + tableH + 50;
+                const benchH = 160;
+                svg.appendChild(svgEl('rect', { x: tableX, y: benchY, width: tableW, height: benchH, rx: 4, fill: '#ffffff', stroke: '#dedfe5', 'stroke-width': 1.4 }));
+                const benchTitle = svgEl('text', { x: tableX + tableW / 2, y: benchY + 24, fill: '#22262f', 'font-size': 14, 'font-weight': 800, 'text-anchor': 'middle' });
+                benchTitle.textContent = 'Benchmark Summary';
+                svg.appendChild(benchTitle);
+                const benchSubtitle = svgEl('text', { x: tableX + tableW / 2, y: benchY + 45, fill: '#676f85', 'font-size': 11.5, 'font-weight': 800, 'text-anchor': 'middle' });
+                benchSubtitle.textContent = `Performance ${tRange}`;
+                svg.appendChild(benchSubtitle);
+                benchmarkMetrics.forEach((metric, idx) => {
+                    const rowY = benchY + 74 + idx * 34;
+                    const valueColor = metric.value >= 0 ? '#22262f' : metric.color;
+                    const nameText = svgEl('text', { x: tableX + 34, y: rowY, fill: metric.color, 'font-size': 14, 'font-weight': 800, 'text-anchor': 'start' });
+                    nameText.textContent = metric.ticker;
+                    svg.appendChild(nameText);
+                    const valueText = svgEl('text', { x: tableX + tableW - 30, y: rowY, fill: valueColor, 'font-size': 14, 'font-weight': 800, 'text-anchor': 'end' });
+                    valueText.textContent = `${metric.value >= 0 ? '+' : ''}${metric.value.toFixed(2)}%`;
+                    svg.appendChild(valueText);
+                    const lineText = svgEl('text', { x: tableX + 34, y: rowY + 15, fill: metric.color, 'font-size': 10.5, 'font-weight': 400, 'text-anchor': 'start' });
+                    lineText.textContent = `${metric.ticker} Line`;
+                    svg.appendChild(lineText);
+                    svg.appendChild(svgEl('line', { x1: tableX + tableW - 66, x2: tableX + tableW - 30, y1: rowY + 14, y2: rowY + 14, stroke: metric.color, 'stroke-width': 1.1, 'stroke-dasharray': '7 5' }));
+                });
+            }
+        }
+
+        function renderAllStocksReplayFrame() {
+            const svg = document.getElementById('allStocksReplayChart');
+            if (!svg || !allStocksReplayData.series.length || !allStocksReplayData.frames.length) {
+                return;
+            }
+            const width = 2000;
+            const height = 900;
+            const scales = allStocksReplayScales(width, height);
+            const frameX = allStocksReplayData.frames[Math.min(allStocksReplayState.frameIndex, allStocksReplayData.frames.length - 1)];
+            const currentMetrics = allStocksReplayData.series
+                .map(series => {
+                    const visiblePoints = series.points.filter(point => point.x <= frameX);
+                    if (!visiblePoints.length) {
+                        return null;
+                    }
+                    return { ticker: series.ticker, color: series.color, value: visiblePoints[visiblePoints.length - 1].y, benchmark: series.benchmark };
+                })
+                .filter(metric => metric !== null);
+            drawAllStocksReplayBase(svg, width, height, scales, currentMetrics);
+
+            const status = document.getElementById('allStocksReplayStatus');
+            let latestTime = '';
+            allStocksReplayData.series.forEach(series => {
+                const visiblePoints = series.points.filter(point => point.x <= frameX);
+                if (!visiblePoints.length) {
+                    return;
+                }
+                const pathData = visiblePoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${scales.x(point.x).toFixed(2)} ${scales.y(point.y).toFixed(2)}`).join(' ');
+                svg.appendChild(svgEl('path', {
+                    d: pathData,
+                    fill: 'none',
+                    stroke: series.color,
+                    'stroke-width': series.benchmark ? 2.4 : 1.8,
+                    'stroke-dasharray': series.benchmark ? '7 5' : 'none',
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round'
+                }));
+                const lastPoint = visiblePoints[visiblePoints.length - 1];
+                latestTime = lastPoint.time || latestTime;
+                const dotX = scales.x(lastPoint.x);
+                const dotY = scales.y(lastPoint.y);
+                svg.appendChild(svgEl('circle', { cx: dotX, cy: dotY, r: series.benchmark ? 4.8 : 4.2, fill: series.color, stroke: '#ffffff', 'stroke-width': 1.5 }));
+                const pillWidth = Math.max(series.ticker.length * 7.4 + 15, 36);
+                const pillX = Math.min(dotX + 8, width - scales.margin.right - pillWidth + 6);
+                const pillY = Math.max(scales.margin.top + 2, Math.min(dotY - 10, height - scales.margin.bottom - 20));
+                const pillColor = darkenHexColor(series.color, 0.20);
+                svg.appendChild(svgEl('rect', { x: pillX, y: pillY, width: pillWidth, height: 20, rx: 10, fill: pillColor, stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.96 }));
+                const label = svgEl('text', { x: pillX + pillWidth / 2, y: pillY + 14, fill: '#ffffff', 'font-size': 11.5, 'font-weight': 800, 'text-anchor': 'middle' });
+                label.textContent = series.ticker;
+                svg.appendChild(label);
+            });
+            status.textContent = `${allStocksReplayState.playing ? 'Playing' : 'Paused'}: ${latestTime || 'start'} (${allStocksReplayState.frameIndex + 1}/${allStocksReplayData.frames.length})`;
+        }
+
+        function setAllStocksReplayPlaying(playing) {
+            const button = document.getElementById('allStocksReplayButton');
+            allStocksReplayState.playing = playing;
+            button.innerHTML = playing ? '&#10073;&#10073; Pause' : '&#9658; Replay';
+            button.classList.toggle('active', playing);
+            if (allStocksReplayState.timer) {
+                clearInterval(allStocksReplayState.timer);
+                allStocksReplayState.timer = null;
+            }
+            if (playing) {
+                allStocksReplayState.timer = setInterval(() => {
+                    if (allStocksReplayState.frameIndex >= allStocksReplayData.frames.length - 1) {
+                        setAllStocksReplayPlaying(false);
+                        document.getElementById('allStocksReplayWrap').classList.remove('active');
+                        document.getElementById('allStocksStaticImage').classList.remove('hidden');
+                        allStocksReplayState.initialized = false;
+                        return;
+                    }
+                    allStocksReplayState.frameIndex = Math.min(allStocksReplayState.frameIndex + 1, allStocksReplayData.frames.length - 1);
+                    renderAllStocksReplayFrame();
+                }, 333);
+            }
+            renderAllStocksReplayFrame();
+        }
+
+        function toggleAllStocksReplay() {
+            if (!allStocksReplayData.series.length || !allStocksReplayData.frames.length) {
+                document.getElementById('allStocksReplayStatus').textContent = 'Replay data unavailable for this run.';
+                return;
+            }
+            document.getElementById('allStocksStaticImage').classList.add('hidden');
+            document.getElementById('allStocksReplayWrap').classList.add('active');
+            if (!allStocksReplayState.initialized || allStocksReplayState.frameIndex >= allStocksReplayData.frames.length - 1) {
+                allStocksReplayState.frameIndex = 0;
+                allStocksReplayState.initialized = true;
+            }
+            setAllStocksReplayPlaying(!allStocksReplayState.playing);
+        }
+
+        window.screenSimChartPopoutUrl = screenSimChartPopoutUrl;
+        document.querySelectorAll('.screener-table th[data-sort-key]').forEach(header => {
+            header.addEventListener('click', () => sortSelectedStocksTable(header));
+        });
+        initSelectedStocksNotes();
+        document.getElementById('tickerChartClose').addEventListener('click', closeTickerChart);
+        document.getElementById('tickerChartModal').addEventListener('click', event => {
+            if (event.target.id === 'tickerChartModal') {
+                closeTickerChart();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeTickerChart();
+            }
+        });
+        updateLiveClock();
+        setInterval(updateLiveClock, 1000);
+        startLiveRefreshCountdown();
+    </script>
+</body>
+</html>

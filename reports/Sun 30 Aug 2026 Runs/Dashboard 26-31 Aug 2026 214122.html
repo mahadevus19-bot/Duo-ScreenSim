@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>In-Swing Report Viewer</title>
+    <style>
+
+    @font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 100 900; font-display: swap; size-adjust: 105%; src: local('IBM Plex Sans'), url('/app-static/ibm-plex-sans-latin-wght-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-style: italic; font-weight: 100 900; font-display: swap; size-adjust: 105%; src: local('IBM Plex Sans Italic'), url('/app-static/ibm-plex-sans-latin-wght-italic.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans Fallback'; src: local('Arial'); ascent-override: 101%; descent-override: 27%; line-gap-override: 0%; size-adjust: 105%; }
+    :root {
+        color-scheme: light;
+        --fv-font-sans: 'IBM Plex Sans', 'IBM Plex Sans Fallback', Arial, sans-serif;
+        --fv-white: #ffffff;
+        --fv-gray-50: #f3f3f5; --fv-gray-100: #dedfe5; --fv-gray-200: #c3c6d0;
+        --fv-gray-300: #a3a8b9; --fv-gray-400: #868ea5; --fv-gray-500: #676f85;
+        --fv-gray-600: #4c5263; --fv-gray-700: #353945; --fv-gray-750: #2c303b;
+        --fv-gray-800: #22262f; --fv-gray-900: #14161d;
+        --fv-blue-50: #ebf4fe; --fv-blue-100: #cae2fc; --fv-blue-200: #9bcbfa;
+        --fv-blue-400: #2f91ef; --fv-blue-500: #306dca;
+        --fv-green-50: #e7f7e8; --fv-green-100: #beeac1; --fv-green-200: #86d895;
+        --fv-green-400: #00a449; --fv-green-500: #19803d;
+        --fv-red-50: #fef0f0; --fv-red-100: #fcd6d6; --fv-red-200: #fbb4b4; --fv-red-500: #d91e2b;
+        --fv-yellow-50: #fdf2df; --fv-yellow-100: #fcdc86; --fv-yellow-200: #f3c736;
+        --fv-yellow-300: #cda30b; --fv-yellow-400: #b08900; --fv-yellow-500: #8b6a00;
+    }
+    html, body, button, input, select, textarea, table, summary, details {
+        font-family: var(--fv-font-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    tbody tr:nth-child(2n) { background: #f3f3f5; }
+    tbody tr:hover { background: #e9eaee; }
+    /* Neutralise the UA's blue for checkboxes, focus rings and selection. */
+    input, select, textarea, button { accent-color: #4c5263; }
+    :focus-visible { outline: 2px solid #676f85; outline-offset: 1px; }
+    ::selection { background: #c3c6d0; color: #14161d; }
+
+    /* ------------------------------------------------------------------
+       Theme switch control (shown in page headers, works in both themes)
+       ------------------------------------------------------------------ */
+    .header-right { justify-self: end; display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
+    .theme-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: rgba(255,255,255,0.85); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+    .theme-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .theme-switch-track { position: relative; width: 30px; height: 16px; border-radius: 999px; background: rgba(255,255,255,0.25); transition: background 0.2s; }
+    .theme-switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff; transition: transform 0.2s, background 0.2s; }
+    .theme-switch input:checked + .theme-switch-track { background: #00c853; }
+    .theme-switch input:checked + .theme-switch-track::after { transform: translateX(14px); background: #06130b; }
+
+    /* ------------------------------------------------------------------
+       App dark theme (BlockTrade-inspired palette)
+       Surfaces: #080B0D / #111715 / #1A1F1C / #232927  Border: #2E3431
+       Text: #F2F4F3 / #A8B2AD  Accents: green #00C853, red #FF5252,
+       amber #FFC107, blue #2962FF
+       ------------------------------------------------------------------ */
+    /* Card/section header band: single knob used by every header rule below
+       (screener cards, watchlist, saved reports, history, chart modal). */
+    body.dark-theme { color-scheme: dark; background: #080b0d; color: #f2f4f3; --card-head-bg: radial-gradient(circle at 18% 0%, rgba(255,255,255,0.08), transparent 42%), linear-gradient(135deg, #050607 0%, #171b1f 48%, #050607 100%); --card-head-border: rgba(255,255,255,0.12); }
+    body.dark-theme tbody tr:nth-child(2n) { background: #141917; }
+    body.dark-theme tbody tr:hover { background: #1d2421; }
+    body.dark-theme input, body.dark-theme select, body.dark-theme textarea, body.dark-theme button { accent-color: #00c853; }
+    body.dark-theme :focus-visible { outline-color: #00c853; }
+    body.dark-theme ::selection { background: #00c853; color: #06130b; }
+    body.dark-theme input[type="text"], body.dark-theme input[type="date"], body.dark-theme input[type="search"], body.dark-theme select, body.dark-theme textarea { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme input::placeholder { color: #6c7570; }
+    body.dark-theme input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+    /* Header / navigation */
+    body.dark-theme .header { background: radial-gradient(circle at 14% 0%, rgba(0,200,83,0.20), transparent 34%), linear-gradient(90deg, #020a07 0%, #052214 42%, #020a07 100%); border: 0; border-bottom: 1px solid rgba(0,200,83,0.18); box-shadow: none; }
+    body.dark-theme .brand-logo { filter: brightness(0) saturate(100%) invert(77%) sepia(69%) saturate(814%) hue-rotate(359deg) brightness(101%) contrast(95%) drop-shadow(0 0 10px rgba(243,199,54,0.24)); opacity: 0.98; }
+    body.dark-theme .report-title { color: #ffffff; text-shadow: none; }
+    body.dark-theme .report-subtitle { color: #ffffff; opacity: 0.82; }
+    body.dark-theme .live-clock { color: #ffffff; }
+    body.dark-theme .live-clock span { color: #f2f4f3; }
+    body.dark-theme .theme-switch { color: #ffffff; }
+    body.dark-theme .tabs { background: rgba(0,0,0,0.26); border-color: rgba(163,230,53,0.16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(0,200,83,0.08); }
+    body.dark-theme .tabs button { color: rgba(255,255,255,0.82); }
+    body.dark-theme .tabs button:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+    body.dark-theme .tabs button.active { background: linear-gradient(135deg, #00c853, #059669); color: #06130b; box-shadow: 0 0 0 1px rgba(163,230,53,0.52), 0 0 22px rgba(0,200,83,0.42); }
+    body.dark-theme .tabs button:disabled, body.dark-theme .tabs button.disabled-tab { color: rgba(255,255,255,0.24); }
+
+    /* Cards / panels */
+    body.dark-theme .card, body.dark-theme details.card { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    /* Card headers: clearly distinct band — lighter surface, separator line and
+       a green accent edge so sections read at a glance. */
+    body.dark-theme .card h2, body.dark-theme .card-title-row, body.dark-theme details.card summary { background: var(--card-head-bg); color: #f2f4f3; border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .card-title-row h2 { background: none; border-bottom: 0; box-shadow: none; }
+    body.dark-theme label span { color: #a8b2ad; }
+    body.dark-theme .checkbox-row { color: #f2f4f3; }
+    body.dark-theme .primary { background: #00c853; color: #06130b; }
+    body.dark-theme .primary:disabled { background: #23292b; color: #6c7570; opacity: 1; }
+    body.dark-theme .secondary { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .secondary:disabled { opacity: 0.4; }
+    body.dark-theme .message { background: #221d0c; color: #ffc107; border-color: #4a3f14; }
+    body.dark-theme .message.success { background: #10201a; color: #9fe8c0; border-color: #1f4732; }
+    body.dark-theme .screener-progress-track { background: #1a1f1c; border-color: #2e3431; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.6); }
+    body.dark-theme .screener-progress-fill { background: repeating-linear-gradient(90deg, #00c853 0 8px, #1a1f1c 8px 10px); }
+
+    /* Tables */
+    body.dark-theme .table-wrap { border-top-color: #2e3431; }
+    body.dark-theme th { background: #1a201d; color: #e5efe9; }
+    body.dark-theme td { border-top-color: #232927; }
+    body.dark-theme td.daily-change-positive { color: #00c853; }
+    body.dark-theme td.daily-change-negative { color: #ff5252; }
+    body.dark-theme td[class*="screener-change-"],
+    body.dark-theme td[class*="screener-rvol-"],
+    body.dark-theme td[class*="screener-position-"],
+    body.dark-theme td[class*="screener-comment-"] { color: #f8fafc; font-weight: 700; }
+    body.dark-theme td.screener-change-pos-1 { background: #0b3f25; }
+    body.dark-theme td.screener-change-pos-2 { background: #075f35; }
+    body.dark-theme td.screener-change-pos-3 { background: #008a48; }
+    body.dark-theme td.screener-change-pos-4 { background: #00ad5a; }
+    body.dark-theme td.screener-change-pos-5 { background: #007a3e; }
+    body.dark-theme td.screener-change-neg-1 { background: #4a1b1f; }
+    body.dark-theme td.screener-change-neg-2 { background: #6b2228; }
+    body.dark-theme td.screener-change-neg-3 { background: #8f252c; }
+    body.dark-theme td.screener-change-neg-4 { background: #b91c1c; }
+    body.dark-theme td.screener-change-neg-5 { background: #7f1d1d; }
+    body.dark-theme td.screener-rvol-1 { background: #dbeafe; color: #1e3a5f; }
+    body.dark-theme td.screener-rvol-2 { background: #93c5fd; color: #102a43; }
+    body.dark-theme td.screener-rvol-3 { background: #2563eb; color: #ffffff; }
+    body.dark-theme td.screener-rvol-4 { background: #1d4ed8; color: #ffffff; }
+    body.dark-theme td.screener-rvol-5 { background: #1e3a8a; color: #ffffff; }
+    body.dark-theme td.screener-position-pos-1 { background: #0b3f25; }
+    body.dark-theme td.screener-position-pos-2 { background: #075f35; }
+    body.dark-theme td.screener-position-pos-3 { background: #008a48; }
+    body.dark-theme td.screener-position-pos-4 { background: #00ad5a; }
+    body.dark-theme td.screener-position-pos-5 { background: #007a3e; }
+    body.dark-theme td.screener-position-neg-1 { background: #4a1b1f; }
+    body.dark-theme td.screener-position-neg-2 { background: #6b2228; }
+    body.dark-theme td.screener-position-neg-3 { background: #8f252c; }
+    body.dark-theme td.screener-position-neg-4 { background: #b91c1c; }
+    body.dark-theme td.screener-position-neg-5 { background: #7f1d1d; }
+    body.dark-theme td.screener-bool-yes { color: #4ade80; font-weight: 800; }
+    body.dark-theme td.screener-bool-no { color: #ff5252; font-weight: 800; }
+    body.dark-theme td.screener-comment-below { background: #303746; color: #cbd5e1; }
+    body.dark-theme td.screener-comment-5d { background: #365314; }
+    body.dark-theme td.screener-comment-10d { background: #3f6212; }
+    body.dark-theme td.screener-comment-1m { background: #166534; }
+    body.dark-theme td.screener-comment-2m { background: #047857; }
+    body.dark-theme td.screener-comment-3m { background: #0f766e; }
+    body.dark-theme td.screener-comment-6m { background: #065f46; }
+    body.dark-theme td.screener-comment-1y { background: #b08900; color: #06130b; }
+    body.dark-theme td.screener-momentum-positive,
+    body.dark-theme td.screener-rsi-pos-1 { color: #4ade80; font-weight: 700; }
+    body.dark-theme td.screener-momentum-negative,
+    body.dark-theme td.screener-rsi-neg-1 { color: #ff7b7b; font-weight: 700; }
+    body.dark-theme td.screener-rsi-pos-2 { color: #22c55e; font-weight: 800; }
+    body.dark-theme td.screener-rsi-pos-3 { color: #00c853; font-weight: 900; }
+    body.dark-theme td.screener-rsi-neg-2 { color: #ff5252; font-weight: 800; }
+    body.dark-theme td.screener-rsi-neg-3 { color: #ef4444; font-weight: 900; }
+    body.dark-theme td.screener-comment-ath { color: #00c853; }
+    body.dark-theme .result-toolbar { background: #141917; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .selection-count, body.dark-theme .pagination { color: #f2f4f3; }
+    body.dark-theme .ticker-chart-link { color: #58a6ff; }
+    body.dark-theme .ticker-chart-link:hover { color: #82bfff; }
+
+    /* Screener controls row */
+    body.dark-theme .sim-controls { background: #111715; border-bottom-color: #2e3431; }
+    body.dark-theme .entry-date-text { color: #f2f4f3; }
+    body.dark-theme .sim-search input { background-color: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .sim-search input:focus { border-color: #00c853; box-shadow: 0 0 0 3px rgba(0,200,83,0.22); }
+    body.dark-theme .refine-inline-button { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-inline-count, body.dark-theme .refine-summary-count { background: #00c853; color: #06130b; }
+    body.dark-theme .selected-stock-summary { background: #1a1f1c; color: #a8b2ad; }
+    body.dark-theme .selected-stock-summary.has-selection { background: #10301f; color: #7ce3a8; }
+
+    /* Refine results */
+    body.dark-theme .refine-body { background: #111715; border-top-color: #2e3431; }
+    body.dark-theme .refine-label { color: #a8b2ad; }
+    body.dark-theme .refine-num-row input { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-string-btn { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-string-panel { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 8px 18px rgba(0,0,0,0.6); }
+    body.dark-theme .refine-string-opt { color: #f2f4f3; }
+    body.dark-theme .refine-string-clear { background: #1a1f1c; border-top-color: #2e3431; color: #a8b2ad; }
+    body.dark-theme .refine-chip { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-active-row { color: #a8b2ad; }
+    body.dark-theme .refine-link-clear { color: #58a6ff; }
+    body.dark-theme .refine-action-buttons .refine-clear-btn { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .refine-action-buttons .refine-apply-btn { background: #00c853; color: #06130b; }
+    body.dark-theme .refine-empty-note { color: #6c7570; }
+
+    /* Watchlist */
+    body.dark-theme .watchlist-card { background: #111715; }
+    body.dark-theme .watchlist-card-title-row { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .watchlist-table th { background: #111715; color: #a8b2ad; }
+    body.dark-theme .watchlist-table td { border-top-color: #232927; }
+    body.dark-theme .watchlist-table-wrap { border-right-color: #2e3431; }
+    body.dark-theme .watchlist-ticker-btn { color: #58a6ff; }
+    body.dark-theme .watchlist-ticker-btn.active { color: #ffc107; }
+    body.dark-theme .watchlist-chart-toolbar { background: #141917; border-bottom-color: #2e3431; }
+    body.dark-theme .watchlist-forward-toggle { color: #f2f4f3; }
+    body.dark-theme .watchlist-chart-body { background: #111715; }
+    body.dark-theme .watchlist-chart-placeholder { color: #6c7570; }
+    body.dark-theme .watchlist-run-button:disabled { background: #23292b; color: #6c7570; }
+    body.dark-theme .watchlist-run-button.processing,
+    body.dark-theme .watchlist-run-button.processing:disabled { background: linear-gradient(90deg, #d4af37 0 var(--run-progress), #23292b var(--run-progress) 100%); color: #111111; cursor: wait; }
+    body.dark-theme .watchlist-run-button.report-ready { border-color: rgba(0,200,83,0.5); background: linear-gradient(135deg, #17d16b, #00c853); color: #06130b; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+
+    /* Saved reports & history */
+    body.dark-theme .saved-report-section, body.dark-theme .section { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .saved-report-section h1, body.dark-theme .section h1 { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #00c853; }
+    body.dark-theme .report-card { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+    body.dark-theme .report-card h2 { color: #f2f4f3; }
+    body.dark-theme .report-card p { color: #a8b2ad; }
+    body.dark-theme .badge.live { background: #10301f; color: #7ce3a8; border-color: #1f4732; }
+    body.dark-theme .badge.muted { background: #1a1f1c; color: #a8b2ad; border-color: #2e3431; }
+    body.dark-theme .status { color: #f2f4f3; }
+    body.dark-theme .dates { color: #a8b2ad; }
+    body.dark-theme .open { background: #00c853; color: #06130b; }
+    body.dark-theme .open.live-action { background: #1a1f1c; color: #f2f4f3; border: 1px solid #2e3431; }
+    body.dark-theme .empty { color: #6c7570; }
+    body.dark-theme .back { background: #1a1f1c; color: #f2f4f3; border: 1px solid #2e3431; }
+    body.dark-theme .history-title { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .history-grid { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .history-card { background: #1a1f1c; border-color: #2e3431; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+    body.dark-theme .history-ticker { color: #58a6ff; }
+    body.dark-theme .history-change.up { background: #00c853; color: #06130b; }
+    body.dark-theme .history-change.down { background: #ff5252; color: #16090a; }
+    body.dark-theme .history-date, body.dark-theme .history-footer { color: #a8b2ad; }
+    body.dark-theme .history-values span { background: #232927; color: #f2f4f3; }
+    body.dark-theme .history-values em { color: #a8b2ad; }
+    body.dark-theme .history-empty { background: #111715; border-color: #2e3431; color: #6c7570; }
+
+    /* Report viewer (dashboard) */
+    body.dark-theme .portfolio-subtabs-wrap { background: #0e1210; border-bottom-color: #232927; box-shadow: none; }
+    body.dark-theme .portfolio-subtabs { background: #1a1f1c; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .portfolio-subtabs button { color: #a8b2ad; }
+    body.dark-theme .portfolio-subtabs button:hover { background: #232927; color: #f2f4f3; }
+    body.dark-theme .portfolio-subtabs button.active { background: #00c853; color: #06130b; box-shadow: none; }
+    body.dark-theme img { border-color: #2e3431; }
+    body.dark-theme .replay-chart { border-color: #2e3431; }
+    /* Static report chart PNGs (Account View / All Stocks / Individual Stocks)
+       are rendered on a white canvas at report time. In dark mode, invert the
+       canvas to dark while hue-rotating so chart colors stay recognizable.
+       This also covers previously saved reports with no dark variants. */
+    body.dark-theme .fit-image,
+    body.dark-theme .single-stock-image,
+    body.dark-theme .replay-chart { filter: invert(0.92) hue-rotate(180deg); }
+    body.dark-theme .stock-button { background: #1a1f1c; color: #58a6ff; border-color: #2e3431; box-shadow: none; }
+    body.dark-theme .stock-button:hover { background: #232927; color: #82bfff; }
+    body.dark-theme .stock-button.active { background: #00c853; color: #06130b; }
+    body.dark-theme .replay-button { background: #1a1f1c; color: #f2f4f3; }
+    body.dark-theme .replay-button:hover { background: #232927; }
+    body.dark-theme .replay-button.active { background: #ff5252; color: #16090a; }
+    body.dark-theme .live-refresh-banner { background: #1a1f1c; color: #f2f4f3; box-shadow: 0 8px 18px rgba(0,0,0,0.5); }
+    body.dark-theme .live-refresh-banner strong { color: #ffc107; }
+    body.dark-theme .live-refresh-banner span { color: #a8b2ad; }
+    body.dark-theme .screener-report { background: #111715; border-color: #2e3431; box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+    body.dark-theme .screener-summary { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #f3c736, inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.26); }
+    body.dark-theme .screener-kicker { color: #ffc107; }
+    body.dark-theme .selected-ticker-list { background: rgba(255,255,255,0.07); }
+    body.dark-theme .screener-filters { background: #111715; border-bottom-color: #2e3431; }
+    body.dark-theme .screener-filter { background: #1a1f1c; border-color: #2e3431; }
+    body.dark-theme .screener-filter span { color: #a8b2ad; }
+    body.dark-theme .screener-filter strong { color: #f2f4f3; }
+    body.dark-theme .screener-table th { background: #1a201d; color: #e5efe9; }
+    body.dark-theme .screener-table td { border-top-color: #232927; }
+    body.dark-theme .screener-table td.screener-comment-ath { color: #00c853; }
+    body.dark-theme .screener-table tr.selected td:not([class*="screener-change-"]):not([class*="screener-rvol-"]):not([class*="screener-position-"]):not([class*="screener-comment-"]) { background: #10301f; }
+    body.dark-theme .screener-table tr.selected td[class*="screener-change-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-rvol-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-position-"],
+    body.dark-theme .screener-table tr.selected td[class*="screener-comment-"] { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.04); }
+    body.dark-theme .report-notes { background: #141917; border-top-color: #2e3431; }
+    body.dark-theme .report-notes h3 { color: #f2f4f3; }
+    body.dark-theme .report-notes-status { color: #a8b2ad; }
+    body.dark-theme .report-notes textarea { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; }
+    body.dark-theme .report-notes textarea:focus { border-color: #00c853; box-shadow: 0 0 0 3px rgba(0,200,83,0.18); }
+
+    /* Chart modal */
+    body.dark-theme .chart-modal { background: rgba(0,0,0,0.72); }
+    body.dark-theme .chart-modal-card { background: #111715; border-color: #2e3431; }
+    body.dark-theme .chart-modal-header { background: var(--card-head-bg); border-bottom: 1px solid var(--card-head-border); box-shadow: inset 3px 0 0 #00c853; }
+    body.dark-theme .chart-modal-body img { background: #ffffff; border-color: #2e3431; }
+
+    /* Chart popout page */
+    body.dark-theme .top { background: #0e1210; color: #f2f4f3; }
+    body.dark-theme .tv { background: #1a1f1c; color: #f2f4f3; }
+    body.dark-theme .tv:hover { background: #232927; }
+    body.dark-theme .nav { background: rgba(255,255,255,0.06); border-color: #2e3431; color: #a8b2ad; }
+    body.dark-theme .nav:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
+    body.dark-theme .label { background: #141917; color: #a8b2ad; border-bottom-color: #2e3431; }
+    body.dark-theme .chart-shell, body.dark-theme .spinner { background: #1b202b; color: #a8b2ad; }
+    body.dark-theme .wrap .card img { background: #1b202b; }
+
+    /* Report/dashboard buttons and pills */
+    body.dark-theme .dashboard-ready { background: #1a1f1c; border-color: #2e3431; color: #f2f4f3; box-shadow: 0 5px 13px rgba(0,0,0,0.4); }
+    body.dark-theme .dashboard-ready:hover { background: #232927; }
+
+        body { margin: 0; background: #f3f3f5; color: #22262f; font-family: var(--fv-font-sans); }
+        .header { display: grid; grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr); align-items: center; gap: 16px; padding: 3px 18px; background: #353945; color: white; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid rgba(255,255,255,0.14); }
+        .brand { justify-self: start; display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .brand-logo { display: block; width: 108px; height: 52px; object-fit: contain; border: 0; border-radius: 0; background: transparent; filter: brightness(0) invert(1); }
+        .brand-text { display: block; min-width: 0; }
+        .report-title { display: block; font-size: 14px; line-height: 1.1; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+        .report-subtitle { display: block; margin-top: 3px; color: rgba(255,255,255,0.72); font-size: 12px; line-height: 1.2; white-space: nowrap; }
+        .live-clock { justify-self: end; color: #ffffff; font-size: 12px; font-weight: 600; text-align: right; white-space: nowrap; }
+        .live-clock span { display: inline-block; width: 92px; margin-top: 3px; color: rgba(255,255,255,0.68); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+        .tabs { display: inline-flex; gap: 4px; align-items: center; justify-self: center; border-radius: 999px; padding: 4px; background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.20); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+        button { border: none; background: transparent; color: rgba(255,255,255,0.76); min-width: 112px; padding: 10px 22px; border-radius: 999px; cursor: pointer; font-size: 10.5px; font-weight: 500; text-align: center; white-space: nowrap; opacity: 1; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        button:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+        button.active { background: #ffffff; color: #22262f; box-shadow: 0 8px 18px rgba(0,0,0,0.22); font-weight: 600; }
+        button:focus-visible { outline: 2px solid rgba(255,255,255,0.85); outline-offset: 2px; }
+        .portfolio-subtabs-wrap { display: flex; justify-content: center; padding: 3px 8px 2px; background: #f3f3f5; border-bottom: 1px solid #dedfe5; box-shadow: inset 0 1px 0 rgba(255,255,255,0.72); }
+        .portfolio-subtabs-wrap.hidden { display: none; }
+        .portfolio-subtabs { display: inline-flex; gap: 3px; padding: 2px; border: 1px solid #c3c6d0; border-radius: 999px; background: #ffffff; box-shadow: 0 4px 12px rgba(20,22,29,0.07); }
+        .portfolio-subtabs button { min-width: 108px; padding: 6px 14px; background: transparent; color: #353945; font-size: 11.2px; font-weight: 800; box-shadow: none; }
+        .portfolio-subtabs button:hover { background: #f3f3f5; color: #22262f; }
+        .portfolio-subtabs button.active { background: #4c5263; color: #ffffff; box-shadow: 0 5px 12px rgba(34,38,47,0.18); }
+        .panel { display: none; padding: 2px 8px 6px; }
+        .panel.active { display: block; }
+        .image-wrap { display: flex; justify-content: center; align-items: flex-start; width: 100%; margin-bottom: 6px; }
+        .all-stocks-stage { position: relative; display: flex; justify-content: center; width: 100%; max-width: 100%; }
+        .replay-button { position: absolute; top: 1.1%; right: 11.8%; z-index: 3; background: #4c5263; color: #ffffff; padding: 6px 12px; font-size: 8.8px; box-shadow: 0 5px 11px rgba(34,38,47,0.18); }
+        .replay-button:hover { background: #22262f; }
+        .replay-button.active { background: #d91e2b; color: #ffffff; }
+        .replay-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+        .replay-wrap { display: none; justify-content: center; width: 100%; }
+        .replay-wrap.active { display: flex; }
+        .replay-chart { display: block; width: auto; max-width: 100%; height: calc(100vh - 86px); aspect-ratio: 20 / 9; background: #ffffff; border: 1px solid #c3c6d0; border-radius: 8px; }
+        img { background: white; border: 1px solid #c3c6d0; border-radius: 8px; }
+        .fit-image { max-width: 100%; max-height: calc(100vh - 86px); width: auto; height: auto; object-fit: contain; }
+        .fit-image.hidden { display: none; }
+        .stock-picker { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; margin: 0 auto 1px; max-width: 72%; }
+        .stock-button { min-width: auto; background: #ffffff; color: #306dca; border: 1px solid #c3c6d0; padding: 5px 10px; font-size: 9px; font-weight: 600; box-shadow: 0 2px 6px rgba(20,22,29,0.08); }
+        .stock-button:hover { background: #f3f3f5; color: #306dca; }
+        .stock-button.active { background: #4c5263; color: #ffffff; box-shadow: 0 6px 14px rgba(34,38,47,0.18); }
+        .single-stock-wrap { display: flex; justify-content: center; align-items: flex-start; width: 100%; }
+        .single-stock-image { max-width: 96%; max-height: calc(100vh - 118px); width: auto; height: auto; object-fit: contain; }
+        .live-refresh-banner { display: none; max-width: 760px; margin: 10px auto 2px; padding: 7px 14px; border-radius: 999px; background: #353945; color: #ffffff; box-shadow: 0 8px 18px rgba(20,22,29,0.18); font-size: 12px; font-weight: 700; text-align: center; }
+        .live-refresh-banner.active { display: block; }
+        .live-refresh-banner strong { display: inline-block; min-width: 18px; color: #fcdc86; font-variant-numeric: tabular-nums; }
+        .live-refresh-banner span { margin-left: 10px; color: #c3c6d0; font-variant-numeric: tabular-nums; }
+        .screener-report { width: min(1760px, calc(100vw - 56px)); max-width: none; margin: 16px auto 26px; background: #ffffff; border: 1px solid #dedfe5; border-radius: 14px; box-shadow: 0 14px 34px rgba(20,22,29,0.08); overflow: hidden; }
+        .screener-summary { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 9px 18px; background: linear-gradient(135deg, #353945, #4c5263); color: #ffffff; }
+        .screener-heading { display: block; min-width: 0; }
+        .screener-summary h2 { margin: 0; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+        .screener-summary p { margin: 3px 0 0; padding: 0; background: transparent; color: rgba(255,255,255,0.82); font-size: 11px; font-weight: 500; white-space: nowrap; }
+        .screener-kicker { color: #fcdc86; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+        .selected-ticker-list { max-width: 38%; padding: 7px 12px; border-radius: 12px; background: rgba(255,255,255,0.12); font-size: 12px; font-weight: 600; line-height: 1.25; }
+        .screener-filters { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 8px; padding: 9px 14px; background: #ffffff; border-bottom: 1px solid #dedfe5; }
+        .screener-filter { border: 1px solid #dedfe5; border-radius: 10px; padding: 6px 9px; background: #ffffff; }
+        .screener-filter span { display: block; color: #676f85; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+        .screener-filter strong { display: block; margin-top: 1px; color: #22262f; font-size: 11.5px; }
+        .screener-table-wrap { overflow-y: auto; overflow-x: hidden; max-height: calc(100vh - 260px); }
+        .screener-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.8px; }
+        .screener-table th { position: sticky; top: 0; background: #4c5263; color: #ffffff; text-align: center; vertical-align: middle; padding: 9px 6px; white-space: normal; z-index: 1; }
+        .screener-table th.sortable { cursor: pointer; user-select: none; }
+        .screener-table th.sortable .th-inner { display: inline-flex; align-items: center; justify-content: center; gap: 5px; line-height: 1; }
+        .screener-table th.sortable .sort-arrow { width: 0; height: 0; flex: none; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; border-bottom: 4.5px solid currentColor; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; }
+        .screener-table th.sortable:hover .sort-arrow { opacity: 0.4; }
+        .screener-table th.sortable.sort-asc .sort-arrow,
+        .screener-table th.sortable.sort-desc .sort-arrow { opacity: 1; }
+        .screener-table th.sortable.sort-desc .sort-arrow { transform: rotate(180deg); }
+        .screener-table th:first-child, .screener-table td:first-child { text-align: center; }
+        .screener-table td { border-top: 1px solid #dedfe5; padding: 8px 6px; text-align: center; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .screener-table th.screener-col-ticker, .screener-table td.screener-col-ticker { width: 4.5%; }
+        .screener-table th.screener-col-anchor-date, .screener-table td.screener-col-anchor-date { width: 6.8%; }
+        .screener-table th.screener-col-price, .screener-table td.screener-col-price { width: 4.8%; }
+        .screener-table th.screener-col-volume, .screener-table td.screener-col-volume { width: 5.3%; }
+        .screener-table th.screener-col-rvol, .screener-table td.screener-col-rvol { width: 4.2%; }
+        .screener-table th.screener-col-mcap, .screener-table td.screener-col-mcap { width: 5.5%; }
+        .screener-table th.screener-col-daily-change, .screener-table td.screener-col-daily-change { width: 5.3%; padding-left: 3px; padding-right: 3px; }
+        .screener-table th.screener-col-rsi14, .screener-table td.screener-col-rsi14 { width: 4.7%; }
+        .screener-table th.screener-col-daily-closing-position, .screener-table td.screener-col-daily-closing-position { width: 8.3%; padding-left: 5px; padding-right: 5px; }
+        .screener-table th.screener-col-macd, .screener-table td.screener-col-macd,
+        .screener-table th.screener-col-macd-signal, .screener-table td.screener-col-macd-signal { width: 4.7%; }
+        .screener-table th.screener-col-macd-histogram, .screener-table td.screener-col-macd-histogram { width: 5.8%; }
+        .screener-table th.screener-col-macd-gt-signal, .screener-table td.screener-col-macd-gt-signal { width: 7.2%; }
+        .screener-table th.screener-col-macd-cross, .screener-table td.screener-col-macd-cross { width: 6.8%; }
+        .screener-table th.screener-col-comment, .screener-table td.screener-col-comment { width: 7.2%; }
+        .screener-table th.screener-col-t0-t3-change, .screener-table td.screener-col-t0-t3-change { width: 8.2%; padding-left: 4px; padding-right: 4px; }
+        .screener-table th.screener-col-t0-t3-change .th-label { white-space: normal; }
+        .screener-table td[class*="screener-change-"], .screener-table td[class*="screener-rvol-"], .screener-table td[class*="screener-position-"], .screener-table td[class*="screener-comment-"] { font-weight: 700; }
+        .screener-table td.screener-change-pos-1 { background: #dcfce7; color: #166534; }
+        .screener-table td.screener-change-pos-2 { background: #86efac; color: #14532d; }
+        .screener-table td.screener-change-pos-3 { background: #22c55e; color: #052e16; }
+        .screener-table td.screener-change-pos-4 { background: #16a34a; color: #ffffff; }
+        .screener-table td.screener-change-pos-5 { background: #15803d; color: #ffffff; }
+        .screener-table td.screener-change-neg-1 { background: #fee2e2; color: #991b1b; }
+        .screener-table td.screener-change-neg-2 { background: #fecaca; color: #7f1d1d; }
+        .screener-table td.screener-change-neg-3 { background: #fca5a5; color: #7f1d1d; }
+        .screener-table td.screener-change-neg-4 { background: #ef4444; color: #ffffff; }
+        .screener-table td.screener-change-neg-5 { background: #b91c1c; color: #ffffff; }
+        .screener-table td.screener-rvol-1 { background: #dbeafe; color: #1e3a5f; }
+        .screener-table td.screener-rvol-2 { background: #bfdbfe; color: #1e3a5f; }
+        .screener-table td.screener-rvol-3 { background: #60a5fa; color: #0f172a; }
+        .screener-table td.screener-rvol-4 { background: #2563eb; color: #ffffff; }
+        .screener-table td.screener-rvol-5 { background: #1e40af; color: #ffffff; }
+        .screener-table td.screener-position-pos-1 { background: #dcfce7; color: #166534; }
+        .screener-table td.screener-position-pos-2 { background: #86efac; color: #14532d; }
+        .screener-table td.screener-position-pos-3 { background: #22c55e; color: #052e16; }
+        .screener-table td.screener-position-pos-4 { background: #16a34a; color: #ffffff; }
+        .screener-table td.screener-position-pos-5 { background: #15803d; color: #ffffff; }
+        .screener-table td.screener-position-neg-1 { background: #fee2e2; color: #991b1b; }
+        .screener-table td.screener-position-neg-2 { background: #fecaca; color: #7f1d1d; }
+        .screener-table td.screener-position-neg-3 { background: #fca5a5; color: #7f1d1d; }
+        .screener-table td.screener-position-neg-4 { background: #ef4444; color: #ffffff; }
+        .screener-table td.screener-position-neg-5 { background: #b91c1c; color: #ffffff; }
+        .screener-table td.screener-bool-yes { color: #16a34a; font-weight: 800; }
+        .screener-table td.screener-bool-no { color: #dc2626; font-weight: 800; }
+        .screener-table td.screener-comment-below { background: #e5e7eb; color: #4b5563; }
+        .screener-table td.screener-comment-5d { background: #d9f99d; color: #365314; }
+        .screener-table td.screener-comment-10d { background: #bef264; color: #365314; }
+        .screener-table td.screener-comment-1m { background: #86efac; color: #14532d; }
+        .screener-table td.screener-comment-2m { background: #34d399; color: #064e3b; }
+        .screener-table td.screener-comment-3m { background: #2dd4bf; color: #134e4a; }
+        .screener-table td.screener-comment-6m { background: #059669; color: #ffffff; }
+        .screener-table td.screener-comment-1y { background: #f3c736; color: #422006; }
+        .screener-table td.screener-momentum-positive, .screener-table td.screener-rsi-pos-1 { color: #16a34a; font-weight: 700; }
+        .screener-table td.screener-momentum-negative, .screener-table td.screener-rsi-neg-1 { color: #dc2626; font-weight: 700; }
+        .screener-table td.screener-rsi-pos-2 { color: #15803d; font-weight: 800; }
+        .screener-table td.screener-rsi-pos-3 { color: #166534; font-weight: 900; }
+        .screener-table td.screener-rsi-neg-2 { color: #b91c1c; font-weight: 800; }
+        .screener-table td.screener-rsi-neg-3 { color: #7f1d1d; font-weight: 900; }
+        .screener-table td.screener-comment-ath { color: #19803d; font-weight: 600; }
+        .screener-table tr.selected td:not([class*="screener-change-"]):not([class*="screener-rvol-"]):not([class*="screener-position-"]):not([class*="screener-comment-"]) { background: #ffffff; }
+        .screener-table tr.selected td[class*="screener-change-"], .screener-table tr.selected td[class*="screener-rvol-"], .screener-table tr.selected td[class*="screener-position-"], .screener-table tr.selected td[class*="screener-comment-"] { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.08); }
+        .report-notes { border-top: 1px solid #dedfe5; padding: 13px 18px 16px; background: #f8fafc; }
+        .report-notes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .report-notes h3 { margin: 0; color: #22262f; font-size: 13px; font-weight: 800; }
+        .report-notes-status { color: #676f85; font-size: 11px; font-weight: 700; }
+        .report-notes textarea { display: block; width: 100%; min-height: 92px; box-sizing: border-box; resize: vertical; border: 1px solid #c3c6d0; border-radius: 10px; padding: 10px 12px; background: #ffffff; color: #22262f; font: inherit; font-size: 12.5px; line-height: 1.45; }
+        .report-notes textarea:focus { border-color: #4c5263; box-shadow: 0 0 0 3px rgba(76,82,99,0.16); outline: none; }
+        .ticker-chart-link { border: none; background: transparent; color: #306dca; cursor: pointer; min-width: auto; padding: 0; font: inherit; font-weight: 600; text-decoration: none; }
+        .ticker-chart-link:hover { color: #2f91ef; text-decoration: underline; }
+        .history-panel { max-width: 1380px; margin: 16px auto 26px; }
+        .history-title { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 14px 18px; border-radius: 14px 14px 0 0; background: linear-gradient(135deg, #353945, #4c5263); color: #ffffff; }
+        .history-title h2 { margin: 0; font-size: 15px; }
+        .history-title p { margin: 0; color: rgba(255,255,255,0.76); font-size: 12px; font-weight: 600; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; padding: 14px; background: #ffffff; border: 1px solid #dedfe5; border-top: 0; border-radius: 0 0 14px 14px; box-shadow: 0 14px 34px rgba(20,22,29,0.08); }
+        .history-card { border: 1px solid #dedfe5; border-radius: 14px; background: #ffffff; padding: 13px 14px; box-shadow: 0 6px 16px rgba(20,22,29,0.06); }
+        .history-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .history-ticker { color: #306dca; font-size: 14px; }
+        .history-change { padding: 4px 10px; border-radius: 999px; color: #ffffff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .history-change.up { background: #00a449; }
+        .history-change.down { background: #d91e2b; }
+        .history-date { margin-top: 7px; color: #676f85; font-size: 11px; font-weight: 600; }
+        .history-range { position: relative; height: 12px; margin: 16px 2px 12px; border-radius: 999px; background: linear-gradient(90deg, #fbb4b4, #fdf2df 50%, #beeac1); box-shadow: inset 0 1px 2px rgba(20,22,29,0.18); }
+        .history-marker { position: absolute; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 1px 4px rgba(20,22,29,0.34); }
+        .history-marker.entry { background: #4c5263; }
+        .history-marker.last { background: #f3c736; }
+        .history-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .history-values span { display: block; padding: 7px 6px; border-radius: 10px; background: #f3f3f5; color: #22262f; font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+        .history-values em { display: block; margin-bottom: 2px; color: #676f85; font-size: 9px; font-style: normal; text-transform: uppercase; }
+        .history-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; color: #4c5263; font-size: 11px; font-weight: 600; }
+        .history-empty { max-width: 720px; margin: 24px auto; padding: 18px; border: 1px solid #dedfe5; border-radius: 14px; background: #ffffff; color: #676f85; font-size: 13px; font-weight: 600; text-align: center; }
+        .chart-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(20,22,29,0.62); z-index: 20; }
+        .chart-modal.open { display: flex; }
+        .chart-modal-card { width: min(1180px, 96vw); max-height: 92vh; overflow: auto; border-radius: 16px; background: #ffffff; box-shadow: 0 24px 70px rgba(0,0,0,0.35); border: 1px solid #c3c6d0; }
+        .chart-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #353945; color: #ffffff; font-weight: 700; }
+        .chart-modal-close { border: none; border-radius: 999px; background: rgba(255,255,255,0.12); color: #ffffff; min-width: auto; width: 32px; height: 32px; padding: 0; cursor: pointer; font-size: 18px; font-weight: 700; }
+        .chart-modal-body { padding: 14px; text-align: center; }
+        .chart-modal-body img { max-width: 100%; height: auto; border: 1px solid #dedfe5; border-radius: 10px; background: #ffffff; }
+        @media (max-width: 980px) {
+            .header { grid-template-columns: 1fr; gap: 12px; padding: 12px 16px; }
+            .tabs, .live-clock { justify-self: start; }
+            .live-clock { text-align: left; }
+            .live-clock span { text-align: left; }
+            button { font-size: 14px; padding: 10px 14px; }
+            .screener-summary { display: block; }
+            .selected-ticker-list { max-width: none; margin-top: 12px; }
+            .screener-filters { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+
+<script>
+(function () {
+    function isDarkStored() {
+        try { return localStorage.getItem('duoDarkTheme') === '1'; } catch (error) { return false; }
+    }
+    function syncToggle(dark) {
+        var toggle = document.getElementById('appThemeToggle');
+        if (toggle) { toggle.checked = dark; }
+    }
+    if (isDarkStored()) {
+        document.body.classList.add('dark-theme');
+    }
+    window.duoIsDarkTheme = function () {
+        return document.body.classList.contains('dark-theme');
+    };
+    window.duoSetDarkTheme = function (enabled) {
+        var dark = Boolean(enabled);
+        document.body.classList.toggle('dark-theme', dark);
+        try { localStorage.setItem('duoDarkTheme', dark ? '1' : '0'); } catch (error) {}
+        syncToggle(dark);
+        document.dispatchEvent(new CustomEvent('duothemechange', { detail: { dark: dark } }));
+    };
+    document.addEventListener('DOMContentLoaded', function () {
+        syncToggle(window.duoIsDarkTheme());
+    });
+})();
+</script>
+
+    <div class="header">
+        <div class="brand">
+            <img class="brand-logo" src="static/nras-logo-transparent.png" alt="NRAS Alpha">
+            <span class="brand-text">
+                <strong class="report-title">Inswing ScreenSim</strong>
+                <span class="report-subtitle">Screening and simulation review</span>
+            </span>
+        </div>
+        <div class="tabs">
+            <button type="button" onclick="goToAppRoute('/?reset=screener')">Screener</button>
+            <button class="active" type="button" data-main-tab="portfolio" onclick="showPortfolioSubTab(currentPortfolioSubTabId, document.querySelector('.portfolio-subtabs button.active') || document.querySelector('.portfolio-subtabs button'))">Portfolio</button>
+            <button type="button" onclick="showMainReportTab('history-30d', this)">30D Follow-Through</button>
+            <button type="button" onclick="goToAppRoute('/?panel=savedReports')">Saved Reports</button>
+        </div>
+        <span class="header-right">
+            <span class="live-clock" id="liveClockDate">--<span id="liveClockTime">--</span></span>
+
+<label class="theme-switch" title="Toggle dark theme">
+    <input type="checkbox" id="appThemeToggle" onchange="duoSetDarkTheme(this.checked)">
+    <span class="theme-switch-track" aria-hidden="true"></span>
+    <span>Dark</span>
+</label>
+
+        </span>
+    </div>
+    <div class="portfolio-subtabs-wrap" id="portfolioSubtabs">
+        <div class="portfolio-subtabs" aria-label="Portfolio report views">
+            <button class="active" type="button" onclick="showPortfolioSubTab('screened', this)">Selected Stocks</button>
+            <button type="button" onclick="showPortfolioSubTab('portfolio', this)">Account View</button>
+            <button type="button" onclick="showPortfolioSubTab('all-stocks', this)">All Stocks</button>
+            <button type="button" onclick="showPortfolioSubTab('individual', this)">Individual Stocks</button>
+        </div>
+    </div>
+<div class="live-refresh-banner" id="liveRefreshBanner">Live 1-min close: next update in <strong id="liveRefreshCountdown">60</strong>s<span id="liveRefreshSnapshot"></span></div>
+
+    <section id="screened" class="panel active">
+        <div class="screener-report">
+            <div class="screener-summary">
+                <div class="screener-heading">
+                    <h2>Anchor Date 26th Aug (Wed) 2026</h2>
+                    <p>6 selected from 180 scanner matches.</p>
+                </div>
+                <div class="selected-ticker-list">ANET, BTSG, DT, LITE, SMMT, SMTC</div>
+            </div>
+            <div class="screener-filters"><div class="screener-filter"><span>MCAP</span><strong>10.00B-500.00B</strong></div>
+<div class="screener-filter"><span>Volume</span><strong>&gt;= 1.00M</strong></div>
+<div class="screener-filter"><span>Price</span><strong>&gt;= 2</strong></div>
+<div class="screener-filter"><span>10D Velocity%</span><strong>&gt;= 3</strong></div>
+<div class="screener-filter"><span>RSI14</span><strong>&gt;= 45</strong></div>
+<div class="screener-filter"><span>MACD&gt;SIGNAL</span><strong>No</strong></div>
+<div class="screener-filter"><span>MACD Cross</span><strong>No</strong></div></div>
+            <div class="screener-table-wrap">
+                <table class="screener-table">
+                    <thead><tr><th class="sortable screener-col-ticker" data-sort-key="TICKER" aria-sort="none"><span class="th-inner"><span class="th-label">Ticker</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-anchor-date" data-sort-key="ANCHOR_DATE" aria-sort="none"><span class="th-inner"><span class="th-label">Anchor Date</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-price" data-sort-key="PRICE" aria-sort="none"><span class="th-inner"><span class="th-label">Price</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-volume" data-sort-key="VOLUME" aria-sort="none"><span class="th-inner"><span class="th-label">Volume</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-rvol" data-sort-key="RVOL" aria-sort="none"><span class="th-inner"><span class="th-label">Rvol</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-mcap" data-sort-key="MCAP" aria-sort="none"><span class="th-inner"><span class="th-label">Mcap</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-daily-change" data-sort-key="DAILY_CHANGE_%" aria-sort="none"><span class="th-inner"><span class="th-label">Change%</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-rsi14" data-sort-key="RSI14" aria-sort="none"><span class="th-inner"><span class="th-label">RSI14</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-daily-closing-position" data-sort-key="DAILY_CLOSING_POSITION" aria-sort="none"><span class="th-inner"><span class="th-label">Closing Position</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd" data-sort-key="MACD" aria-sort="none"><span class="th-inner"><span class="th-label">Macd</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-signal" data-sort-key="MACD_SIGNAL" aria-sort="none"><span class="th-inner"><span class="th-label">Signal</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-histogram" data-sort-key="MACD_HISTOGRAM" aria-sort="none"><span class="th-inner"><span class="th-label">Histogram</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-gt-signal" data-sort-key="MACD_GT_SIGNAL" aria-sort="none"><span class="th-inner"><span class="th-label">Macd &gt; Signal</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-macd-cross" data-sort-key="MACD_CROSS" aria-sort="none"><span class="th-inner"><span class="th-label">MACD Cross</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-triple-ma-bullish" data-sort-key="TRIPLE_MA_BULLISH" aria-sort="none"><span class="th-inner"><span class="th-label">Triple MA</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-comment" data-sort-key="COMMENT" aria-sort="none"><span class="th-inner"><span class="th-label">Comment</span><span class="sort-arrow" aria-hidden="true"></span></span></th><th class="sortable screener-col-t0-t3-change" data-sort-key="T0_T3_CHANGE_%" aria-sort="none"><span class="th-inner"><span class="th-label">Change % (T0-T3)</span><span class="sort-arrow" aria-hidden="true"></span></span></th></tr></thead>
+                    <tbody><tr class=" selected"><td class="screener-col-ticker" data-sort-value="ANET"><button class="ticker-chart-link" type="button" onclick="openTickerChart('ANET', '2026-08-26')">ANET</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-26">2026-08-26</td><td class="screener-col-price" data-sort-value="202.25">202.25</td><td class="screener-col-volume" data-sort-value="7664556.23228">7.66M</td><td class="screener-col-rvol" data-sort-value="0.968539108373">0.97</td><td class="screener-col-mcap" data-sort-value="255082685058">255.08B</td><td class="screener-col-daily-change screener-change-pos-4" data-sort-value="0.0592332669949">5.92%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="60.1571309227">60.16</td><td class="screener-col-daily-closing-position screener-position-pos-2" data-sort-value="Up &amp; U1-U2">Up &amp; U1-U2</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="4.44599705341">4.45</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="5.20393000883">5.2</td><td class="screener-col-macd-histogram screener-momentum-negative" data-sort-value="-0.757932955421">-0.76</td><td class="screener-col-macd-gt-signal screener-bool-no" data-sort-value="0">No</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-neg-3" data-sort-value="-3.37767667277">-3.38%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="BTSG"><button class="ticker-chart-link" type="button" onclick="openTickerChart('BTSG', '2026-08-26')">BTSG</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-26">2026-08-26</td><td class="screener-col-price" data-sort-value="61.35">61.35</td><td class="screener-col-volume" data-sort-value="2552554.67861">2.55M</td><td class="screener-col-rvol" data-sort-value="0.872879707798">0.87</td><td class="screener-col-mcap" data-sort-value="12138971185.4">12.14B</td><td class="screener-col-daily-change screener-change-pos-4" data-sort-value="0.0719902149222">7.20%</td><td class="screener-col-rsi14 screener-rsi-pos-1" data-sort-value="47.9099431247">47.91</td><td class="screener-col-daily-closing-position screener-position-neg-1" data-sort-value="Up &amp; Mid-L1">Up &amp; Mid-L1</td><td class="screener-col-macd screener-momentum-negative" data-sort-value="-1.95448452594">-1.95</td><td class="screener-col-macd-signal screener-momentum-negative" data-sort-value="-2.00424192276">-2</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.049757396824">0.05</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-neg-3" data-sort-value="-3.38235294118">-3.38%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="DT"><button class="ticker-chart-link" type="button" onclick="openTickerChart('DT', '2026-08-26')">DT</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-26">2026-08-26</td><td class="screener-col-price" data-sort-value="51.6">51.6</td><td class="screener-col-volume" data-sort-value="7934878.74936">7.93M</td><td class="screener-col-rvol screener-rvol-1" data-sort-value="1.1031598579">1.1</td><td class="screener-col-mcap" data-sort-value="14912509804.8">14.91B</td><td class="screener-col-daily-change screener-change-pos-3" data-sort-value="0.0305572198922">3.06%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="65.1505246807">65.15</td><td class="screener-col-daily-closing-position screener-position-pos-2" data-sort-value="Up &amp; U1-U2">Up &amp; U1-U2</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="1.49318813092">1.49</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="1.47901396589">1.48</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.0141741650316">0.01</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-triple-ma-bullish screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-pos-3" data-sort-value="3.79036936763">+3.79%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="LITE"><button class="ticker-chart-link" type="button" onclick="openTickerChart('LITE', '2026-08-26')">LITE</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-26">2026-08-26</td><td class="screener-col-price" data-sort-value="939.03">939.03</td><td class="screener-col-volume" data-sort-value="4511432.11557">4.51M</td><td class="screener-col-rvol" data-sort-value="0.86347615277">0.86</td><td class="screener-col-mcap" data-sort-value="84230991000">84.23B</td><td class="screener-col-daily-change screener-change-pos-4" data-sort-value="0.0603738855985">6.04%</td><td class="screener-col-rsi14 screener-rsi-pos-2" data-sort-value="57.400023538">57.4</td><td class="screener-col-daily-closing-position screener-position-pos-2" data-sort-value="Up &amp; U1-U2">Up &amp; U1-U2</td><td class="screener-col-macd screener-momentum-positive" data-sort-value="26.6245265486">26.62</td><td class="screener-col-macd-signal screener-momentum-positive" data-sort-value="22.9179224195">22.92</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="3.70660412909">3.71</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-no" data-sort-value="0">No</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-neg-3" data-sort-value="-4.54110822058">-4.54%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="SMMT"><button class="ticker-chart-link" type="button" onclick="openTickerChart('SMMT', '2026-08-26')">SMMT</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-26">2026-08-26</td><td class="screener-col-price" data-sort-value="14.23">14.23</td><td class="screener-col-volume" data-sort-value="11634709.8933">11.63M</td><td class="screener-col-rvol screener-rvol-2" data-sort-value="2.33657048942">2.34</td><td class="screener-col-mcap" data-sort-value="11351976836.5">11.35B</td><td class="screener-col-daily-change screener-change-pos-4" data-sort-value="0.065119760479">6.51%</td><td class="screener-col-rsi14 screener-rsi-pos-1" data-sort-value="54.0117253293">54.01</td><td class="screener-col-daily-closing-position screener-position-pos-1" data-sort-value="Up &amp; Mid-U1">Up &amp; Mid-U1</td><td class="screener-col-macd screener-momentum-negative" data-sort-value="-0.246094162717">-0.25</td><td class="screener-col-macd-signal screener-momentum-negative" data-sort-value="-0.295762451653">-0.3</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.0496682889362">0.05</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-neg-3" data-sort-value="-3.53023418385">-3.53%</td></tr>
+<tr class=" selected"><td class="screener-col-ticker" data-sort-value="SMTC"><button class="ticker-chart-link" type="button" onclick="openTickerChart('SMTC', '2026-08-26')">SMTC</button></td><td class="screener-col-anchor-date" data-sort-value="2026-08-26">2026-08-26</td><td class="screener-col-price" data-sort-value="140.8">140.8</td><td class="screener-col-volume" data-sort-value="10150192.4761">10.15M</td><td class="screener-col-rvol screener-rvol-2" data-sort-value="3.79793566466">3.8</td><td class="screener-col-mcap" data-sort-value="13115684454.4">13.12B</td><td class="screener-col-daily-change screener-change-pos-5" data-sort-value="0.104140526976">10.41%</td><td class="screener-col-rsi14 screener-rsi-pos-1" data-sort-value="54.7420108053">54.74</td><td class="screener-col-daily-closing-position screener-position-pos-1" data-sort-value="Up &amp; Mid-U1">Up &amp; Mid-U1</td><td class="screener-col-macd screener-momentum-negative" data-sort-value="-0.569395345716">-0.57</td><td class="screener-col-macd-signal screener-momentum-negative" data-sort-value="-0.926893489118">-0.93</td><td class="screener-col-macd-histogram screener-momentum-positive" data-sort-value="0.357498143402">0.36</td><td class="screener-col-macd-gt-signal screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-macd-cross screener-bool-yes" data-sort-value="1">Yes</td><td class="screener-col-triple-ma-bullish screener-bool-no" data-sort-value="0">No</td><td class="screener-col-comment screener-comment-5d" data-sort-value="5D high">5D high</td><td class="screener-col-t0-t3-change screener-change-neg-4" data-sort-value="-5.7106918239">-5.71%</td></tr></tbody>
+                </table>
+            </div>
+            <div class="report-notes">
+                <div class="report-notes-head">
+                    <h3>Report Notes</h3>
+                    <span class="report-notes-status" id="selectedStocksNoteStatus">Autosaved in this browser</span>
+                </div>
+                <textarea id="selectedStocksNote" rows="4" placeholder="Add your notes, observations, or follow-up reminders for this saved report..."></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section id="portfolio" class="panel">
+        <div class="image-wrap"><img class="fit-image" src="meta data/2_Portfolio Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140487" alt="Portfolio performance"></div>
+    </section>
+    <section id="all-stocks" class="panel">
+        <div class="image-wrap">
+            <div class="all-stocks-stage">
+                <button class="replay-button" id="allStocksReplayButton" type="button" onclick="toggleAllStocksReplay()">&#9658; Replay</button>
+                <img class="fit-image" id="allStocksStaticImage" src="meta data/2_All Symbols Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140495" alt="All stocks performance">
+                <div class="replay-wrap" id="allStocksReplayWrap"><svg class="replay-chart" id="allStocksReplayChart" role="img" aria-label="All stocks replay chart"></svg></div>
+            </div>
+            <span class="replay-status" id="allStocksReplayStatus">10-minute bars, 1 bar every 1/3 sec</span>
+        </div>
+    </section>
+    <section id="individual" class="panel">
+        <div class="stock-picker" id="stockPicker">
+            <button class="stock-button active" type="button" onclick="showStockChart(0, this)">DT</button>
+            <button class="stock-button" type="button" onclick="showStockChart(1, this)">ANET</button>
+            <button class="stock-button" type="button" onclick="showStockChart(2, this)">BTSG</button>
+            <button class="stock-button" type="button" onclick="showStockChart(3, this)">SMMT</button>
+            <button class="stock-button" type="button" onclick="showStockChart(4, this)">LITE</button>
+            <button class="stock-button" type="button" onclick="showStockChart(5, this)">SMTC</button>
+        </div>
+        <div class="single-stock-wrap">
+            <img class="single-stock-image" id="selectedStockChart" src="meta data/2_DT Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140488" alt="Selected stock chart">
+        </div>
+    </section>
+
+    <section id="history-30d" class="panel">
+        <div class="history-panel">
+            <div class="history-title">
+                <h2>30D Follow-Through</h2>
+                <p>Daily price range from entry date through up to 30 trading days.</p>
+            </div>
+            <div class="history-grid">
+                
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('ANET', '2026-08-26')">ANET</button>
+                    <span class="history-change down">-3.38%</span>
+                </div>
+                <div class="history-date">2026-08-26 to 2026-08-28 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 74.25%"></span>
+                    <span class="history-marker last" style="left: 29.39%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$190.91</span>
+                    <span><em>Entry</em>$202.21</span>
+                    <span><em>Last</em>$195.38</span>
+                    <span><em>High</em>$206.13</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 7.53%</span>
+                    <span>Low -5.59% · High +1.94%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('BTSG', '2026-08-26')">BTSG</button>
+                    <span class="history-change down">-3.38%</span>
+                </div>
+                <div class="history-date">2026-08-26 to 2026-08-28 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 69.64%"></span>
+                    <span class="history-marker last" style="left: 37.25%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$56.75</span>
+                    <span><em>Entry</em>$61.20</span>
+                    <span><em>Last</em>$59.13</span>
+                    <span><em>High</em>$63.14</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 10.44%</span>
+                    <span>Low -7.27% · High +3.17%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('DT', '2026-08-26')">DT</button>
+                    <span class="history-change up">+3.79%</span>
+                </div>
+                <div class="history-date">2026-08-26 to 2026-08-28 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 48.31%"></span>
+                    <span class="history-marker last" style="left: 83.24%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$49.00</span>
+                    <span><em>Entry</em>$51.71</span>
+                    <span><em>Last</em>$53.67</span>
+                    <span><em>High</em>$54.61</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 10.85%</span>
+                    <span>Low -5.24% · High +5.61%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('LITE', '2026-08-26')">LITE</button>
+                    <span class="history-change down">-4.38%</span>
+                </div>
+                <div class="history-date">2026-08-26 to 2026-08-28 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 63.58%"></span>
+                    <span class="history-marker last" style="left: 20.07%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$876.09</span>
+                    <span><em>Entry</em>$936.00</span>
+                    <span><em>Last</em>$895.00</span>
+                    <span><em>High</em>$970.32</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 10.07%</span>
+                    <span>Low -6.40% · High +3.67%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('SMMT', '2026-08-26')">SMMT</button>
+                    <span class="history-change down">-4.02%</span>
+                </div>
+                <div class="history-date">2026-08-26 to 2026-08-28 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 52.40%"></span>
+                    <span class="history-marker last" style="left: 17.96%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$13.43</span>
+                    <span><em>Entry</em>$14.30</span>
+                    <span><em>Last</em>$13.73</span>
+                    <span><em>High</em>$15.10</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 11.67%</span>
+                    <span>Low -6.12% · High +5.56%</span>
+                </div>
+            </article>
+
+            <article class="history-card">
+                <div class="history-card-head">
+                    <button class="ticker-chart-link history-ticker" type="button" onclick="openTickerChart('SMTC', '2026-08-26')">SMTC</button>
+                    <span class="history-change down">-5.72%</span>
+                </div>
+                <div class="history-date">2026-08-26 to 2026-08-28 · 3 trading days</div>
+                <div class="history-range">
+                    <span class="history-marker entry" style="left: 49.73%"></span>
+                    <span class="history-marker last" style="left: 14.17%"></span>
+                </div>
+                <div class="history-values">
+                    <span><em>Low</em>$128.00</span>
+                    <span><em>Entry</em>$139.12</span>
+                    <span><em>Last</em>$131.17</span>
+                    <span><em>High</em>$150.37</span>
+                </div>
+                <div class="history-footer">
+                    <span>Range 16.08%</span>
+                    <span>Low -8.00% · High +8.08%</span>
+                </div>
+            </article>
+
+            </div>
+        </div>
+    </section>
+
+    <div class="chart-modal" id="tickerChartModal" aria-hidden="true">
+        <div class="chart-modal-card" role="dialog" aria-modal="true" aria-labelledby="tickerChartTitle">
+            <div class="chart-modal-header">
+                <span id="tickerChartTitle">Daily chart</span>
+                <button class="chart-modal-close" type="button" id="tickerChartClose" aria-label="Close chart">&times;</button>
+            </div>
+            <div class="chart-modal-body">
+                <img id="tickerChartImage" alt="6 month daily chart with MACD">
+            </div>
+        </div>
+    </div>
+    <script>
+        const allStocksReplayData = {"series": [{"ticker": "DT", "color": "#3962de", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": -0.06768516727906342, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.11603171533552943, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.20305550183717652, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.23206343067104515, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": -0.2514020498936425, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.3480951460065746, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": -0.18371688261457914, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": -0.09669309611294578, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": -0.11603171533552943, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": 0.2514020498936425, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 3.7033455811255056, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 4.080448655965963, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": 4.52523689808547, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": 4.215818990524077, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": 4.293173467414425, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 3.6743376522916233, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": 3.210210790949519, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 3.094179075614004, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 2.7460839296074293, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 3.0845097660027054, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": 2.9781473602784745, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 2.7847611680525968, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 2.5720363566041353, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": 2.6687294527170806, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 2.823438406497778, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": 2.726745310384832, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": 2.871784954554244, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": 2.8911235737768273, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": 3.181202862115637, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 3.2488880293947004, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 3.2392187197834015, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 3.1908721717269355, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 2.9781473602784745, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 2.9781473602784745, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 3.2875652678398684, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": 3.1135176948365877, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 3.1521949332817685, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": 3.645329723457741, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": 3.645329723457741, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": 3.9257397021852656, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": 3.9837555598530305, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": 4.119125894411144, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": 4.186811061690194, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 4.157803132856311, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 4.003094179075614, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 4.080448655965963, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 4.022432798298198, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 3.5776445561786914, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 3.3455811255076324, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": 3.6549990330690396, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": 4.912009282537225, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": 4.505898278862886, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": 3.790369367627153, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": 3.5583059369560943, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": 3.819377296461035, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": 3.684006961902922, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": 4.196480371301492, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": 4.351189325082189, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": 4.370527944304773, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": 4.573583446141949, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": 4.892670663314642, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": 5.163411332430868, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": 4.921678592148524, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": 4.612260684587117, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": 4.1386578998259465, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": 4.109456584799845, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": 3.6163217946238593, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": 3.6259911042351574, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": 3.8097079868497365, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": 3.867723844517501, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": 3.8097079868497365, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": 3.509959388899628, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": 3.5583059369560943, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": 3.4809514600657456, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": 3.6163217946238593, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": 3.6549990330690396, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": 3.5679752465673924, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": 3.7516921291819725, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": 3.867723844517501, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": 3.8483852252949173, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": 3.6549990330690396, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": 3.6549990330690396, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": 3.7807000580158547, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": 3.8870624637400852, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": 3.858054534906203, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": 3.7130148907368046, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": 3.72268420034809, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": 3.461612840843162, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": 3.7710307484045558, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": 3.790369367627153, "time": "2026-08-28 16:00"}]}, {"ticker": "ANET", "color": "#3fb277", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": 0.0815983383611058, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.10385243064141632, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.009890707680139573, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.024726769200341905, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": -0.089016369121214, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.07170763068098028, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": -0.20275950744275584, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": -0.11868849216161866, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": 0.03461747688046742, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": -0.1681420305622884, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": -0.20770486128283264, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 0.2225409228030209, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": 0.3214479996043745, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": -0.343702091884685, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": 0.2077048612828186, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 0.5167894762870221, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": -0.039562830720544236, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": -0.26210375352356513, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": -0.5588249839275977, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": -0.4351911379259163, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": -0.2917758765639698, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": -0.14341526136196056, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": -0.15889421888136487, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": -0.687404183769356, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": -0.2843578458038757, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": -0.16319667672222565, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": -0.10385243064141632, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": -0.14836061520202332, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": -0.343702091884685, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": -0.1879234459225535, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": -0.10385243064141632, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": -0.20770486128283264, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": -0.20275950744275584, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": -0.5074922110677104, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": -0.6923495376094188, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": -0.9791306067949235, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": -0.7071855991296211, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": -1.139904060135506, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": -0.8901636912121117, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": -1.4242619059393677, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": -1.2066663369764095, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": -1.216557044656549, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": -1.0583057217744, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": -0.8876910142920804, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": -0.8357647989713652, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": -0.8802729835319721, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": -1.0929231986548678, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": -0.8555462143316444, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": -0.5588249839275977, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": -0.553879630087535, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": -1.790218090104349, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": -2.2303545818703423, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": -2.4232233816329587, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": -2.917758765639684, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": -2.8435784580386727, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": -2.6185648583156205, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": -2.581474704515107, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": -1.8001087977844887, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": -1.9361060283863412, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": -2.119084120468818, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": -2.0585035359279926, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": -2.1314475050689885, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": -2.2896988279511374, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": -2.6704910736363217, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": -2.922654665941359, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": -2.907868057959545, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": -3.407348795806347, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": -3.5507640571682937, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": -3.4469116265268775, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": -3.0611740270016305, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": -3.234261411403996, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": -3.548291380248262, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": -3.674397903169975, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": -3.2095346422036544, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": -3.1996439345235146, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": -3.0611740270016305, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": -3.026556550121163, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": -2.947430888680089, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": -3.0859007962019724, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": -3.1600811038029843, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": -3.189753226843389, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": -3.026556550121163, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": -3.258988180604324, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": -3.229316057563919, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": -3.2688294347460607, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": -3.308441719004994, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": -3.179911972701652, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": -3.2639335344443867, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": -3.407348795806347, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": -3.3776766727659426, "time": "2026-08-28 16:00"}]}, {"ticker": "BTSG", "color": "#e35151", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": -0.1552287581699444, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.3431372549019622, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.19607843137255643, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.05718954248366616, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": -0.06535947712419321, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.032679738562096605, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": 0.12254901960783618, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": 0.11437908496732072, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": 0.23692810457515687, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": 0.24509803921568393, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 2.1568627450980395, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 2.2630718954248334, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": 1.6421568627450904, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": 1.2581699346405164, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": 1.535947712418297, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 0.7434640522875788, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": 0.866013071895415, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 0.8905228758169845, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 0.16339869281044822, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 0.24509803921568393, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": 0.45751633986927126, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 0.20424836601307192, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 0.27777777777776896, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": -0.38398692810457424, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 0.17973856209150232, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": -0.5065359477124219, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": -0.7026143790849668, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": -0.7857843137254991, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": -0.76797385620916, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": -1.0294117647058865, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": -0.7107843137254939, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": -0.29411764705882304, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": -0.31045751633987717, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": -0.31045751633987717, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": -0.11437908496732072, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": -0.5228758169934644, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": -0.29411764705882304, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": -0.45751633986928286, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": -0.4697712418300677, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": -0.473856209150337, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": -0.39215686274510125, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": -0.16339869281045985, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": -0.17973856209150232, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 0.3022875816993385, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 0.3758169934640472, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 0.6454248366013007, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 0.4248366013071863, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 0.45751633986927126, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": -0.473856209150337, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": -0.49019607843137947, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": -0.6209150326797427, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": -0.9640522875817049, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": -1.560457516339878, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": -2.291666666666672, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": -2.320261437908499, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": -2.8758169934640603, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": -2.6751633986928103, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": -2.720588235294128, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": -2.6470588235294192, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": -2.385620915032681, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": -2.450980392156863, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": -2.704248366013074, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": -2.777777777777782, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": -3.1209150326797443, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": -3.2026143790849684, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": -2.76143790849674, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": -2.696078431372558, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": -2.843137254901964, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": -2.5898692810457526, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": -2.5490196078431406, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": -2.4754901960784323, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": -2.483660130718959, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": -2.8104575163398793, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": -2.606209150326807, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": -2.516339869281056, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": -2.450980392156863, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": -2.401960784313735, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": -2.450980392156863, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": -2.238562091503275, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": -2.843137254901964, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": -2.982026143790854, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": -2.9248366013071996, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": -2.892156862745103, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": -2.941176470588242, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": -3.1454248366013142, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": -3.2189542483660225, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": -3.4150326797385673, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": -3.2352941176470655, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": -3.398692810457525, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": -3.382352941176471, "time": "2026-08-28 16:00"}]}, {"ticker": "SMMT", "color": "#39a7c1", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": 0.034952813701508434, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.1398112548060089, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.1398112548060089, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.2411744145403672, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": 0.17476406850751733, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.17476406850751733, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": -0.2446696959105218, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": -0.3145753233135263, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": -0.6641034603285485, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": -0.7340090877315654, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": -0.2446696959105218, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": -1.0464872422229938, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": -0.8039147151345698, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": 0.034952813701508434, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": -0.7689619014330614, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 0.2097168822090258, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": 0.2446696959105218, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 0.8039147151345698, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 0.034952813701508434, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 0.45438657811953514, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": -0.03495281370149602, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 0.0, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 0.17476406850751733, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": 0.3145753233135263, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 0.2796225096120302, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": 0.8388675288360783, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": 1.0835372247466, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": 1.223348479552609, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": 2.062216008388675, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 1.4680181754631307, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 1.6777350576721441, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 1.2583012932541051, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 1.2932541069556134, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 0.5941978329255565, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 0.7689619014330614, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": 0.6641034603285609, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 0.1048584411045129, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": -0.41943376441803915, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": -0.06990562740300445, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": -0.3145753233135263, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": -0.3145753233135263, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": -0.3844809507165307, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": -0.5242922055225396, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": -0.3844809507165307, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": -0.20971688220901338, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": -0.4893393918210436, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 0.1398112548060089, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": -0.041244320167776724, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 0.1048584411045129, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": -0.7340090877315654, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": -1.8874519398811573, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": -2.8311779098217364, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": -3.425375742747293, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": -3.9496679482698327, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": -4.229290457881863, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": -4.50891296749388, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": -4.019573575672837, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": -4.368402656413843, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": -4.229290457881863, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": -4.648724222299889, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": -4.159384830478845, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": -4.2991960852848665, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": -4.50891296749388, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": -4.521495980426417, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": -5.0332051730164205, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": -4.648724222299889, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": -5.173016427822441, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": -5.417686123732963, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": -5.557497378538971, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": -5.557497378538971, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": -5.83711988815099, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": -5.522544564837464, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": -4.50891296749388, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": -4.159384830478845, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": -4.229290457881863, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": -4.089479203075841, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": -3.6350926249563065, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": -3.6700454386578145, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": -4.019573575672837, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": -4.229290457881863, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": -4.473960153792384, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": -4.369101712687871, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": -4.369101712687871, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": -4.439007340090876, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": -4.159384830478845, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": -4.019573575672837, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": -3.844809507165319, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": -3.9496679482698327, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": -4.159384830478845, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": -3.530234183851793, "time": "2026-08-28 16:00"}]}, {"ticker": "LITE", "color": "#cb467d", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": 0.021901592406027844, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": 0.002670925903171165, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.02296996276729631, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.08440125854028169, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": 0.13942233214565627, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": 0.2521354052595888, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": 0.3819424041538288, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": 0.31142996031003717, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": 0.2911309234459242, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": 0.42681395932714083, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 0.5763858099048597, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": -0.8504228075704763, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": -1.0769173241595975, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": -0.9465654563811132, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": -0.3306606268128939, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": -0.5416637731636103, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": -0.8786384688116005, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": -0.7660215490301824, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": -1.3744584697731326, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": -1.1084342498170414, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": -1.238786117595526, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": -1.3819370623020117, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": -0.8637774370863444, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": -1.7211446520050657, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": -0.5956164764077163, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": -0.4449762554687169, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": -0.9855716582710586, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": -1.013349287664063, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": -1.0934770647592709, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 0.2142189411381318, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 0.02296996276729631, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 0.13728559142311936, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 0.4129251446306386, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 0.001602555541902699, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 0.08386707335964746, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": -0.301344544099659, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 0.9204010662336216, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": 0.5560867730407467, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": 0.843478400222219, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": 1.1892351002398502, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": 1.710995133573003, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": 1.8685797618602475, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": 1.4220009508496279, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 1.321574136890295, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 1.462599024577866, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 1.798601503197102, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 0.8883499553955433, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 2.2959279063680227, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 2.0924033525461976, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": 0.8808713628666519, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": -0.39636540403096526, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": -0.9107857329821932, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": -0.498928958712823, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": -1.068893862746462, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": -0.31142996031003717, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": 0.4001047002954049, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": -0.5970480926918103, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": -0.8584355852799899, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": -1.5224277648089486, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": -1.8573618730669164, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": -1.6778756523736564, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": -1.883536946918018, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": -2.136206537358241, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": -3.311413934754623, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": -3.501391552395551, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": -3.1928248246537136, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": -3.5282931180923156, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": -3.859530664900296, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": -3.6960272648116224, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": -3.484489933280272, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": -3.612694376632597, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": -4.122307038958129, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": -3.8974150779109102, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": -3.84666748575061, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": -3.5480579697758063, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": -2.9465654563811134, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": -2.9214587528912803, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": -2.995186991522475, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": -3.0988082328620035, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": -3.389404971127293, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": -3.200303417182605, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": -3.543250303150086, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": -3.7291467460109695, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": -3.686411931560194, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": -3.7601294864877914, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": -3.656497561444653, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": -3.465259266777415, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": -4.030427187888956, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": -4.413972147584675, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": -4.541108220575745, "time": "2026-08-28 16:00"}]}, {"ticker": "SMTC", "color": "#6f7782", "benchmark": false, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": -0.3486073674753018, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.08265947888590051, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": 0.17610062893082087, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": 0.15928122192272787, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": 0.46720575022462224, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": 0.7079964061096234, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": 0.9811320754717046, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": 1.0242587601078248, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": 1.2398921832884056, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": 1.2039532794249856, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 4.22282120395328, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 2.2677448337825705, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": 1.5130278526504868, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": 3.366972147349511, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": 4.017969451931719, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 3.8634321653189576, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": 2.493944294699004, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 3.489667565139256, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 2.9290206648697135, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 3.7915543575920974, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": 3.7196765498652375, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 3.0727762803234544, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 2.584007187780772, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": 2.814016172506733, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 3.849056603773578, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": 3.5974842767295567, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": 2.8571428571428528, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": 2.6271338724168922, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": 2.555256064690032, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 2.353998203054811, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 2.609164420485172, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 1.8149146451033284, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 1.6855345911949677, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 1.674752920035948, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 2.332434860736751, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": 1.7915543575920982, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 2.411500449236291, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": 2.13117699910153, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": 2.2821203953279507, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": 1.9083557951482488, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": 2.2749326145552504, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": 2.803234501347713, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": 3.015274034141954, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 3.029649595687334, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 2.4474393530997314, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 1.1823899371069255, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 0.3270440251572417, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 0.7403414195867034, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 2.4258760107816713, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": 3.0727762803234544, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": 0.621743036837383, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": 0.2695417789757413, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": 0.16891284815814098, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": -1.2794249775381858, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": -0.4266170709793444, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": 0.1509433962264208, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": -0.8086253369272237, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": -1.495058400718787, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": -1.8292902066486882, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": -2.7708894878706127, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": -2.4977538185085315, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": -2.609164420485172, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": -3.455022461814922, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": -4.30548068283918, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": -4.765498652291102, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": -4.40970350404312, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": -5.876010781671167, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": -5.660377358490567, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": -6.26774483378257, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": -5.394429469901165, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": -5.038634321653182, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": -5.897574123989227, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": -5.7250673854447465, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": -5.911949685534587, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": -5.465372866127586, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": -5.045822102425883, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": -5.336927223719685, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": -5.904761904761907, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": -5.919137466307287, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": -6.034141958670268, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": -6.048517520215628, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": -5.883198562443847, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": -6.098831985624448, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": -5.674752920035946, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": -5.509433962264145, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": -5.401617250673844, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": -5.646001796945186, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": -5.602875112309066, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": -5.732255166217427, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": -5.710691823899366, "time": "2026-08-28 16:00"}]}, {"ticker": "SPY", "color": "#111827", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": -0.01955747943204783, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.04824178259905922, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.07757800174713839, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.10300272500881096, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": -0.09843931314132175, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.08716116666883901, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": -0.09387590127384739, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": -0.13091776731814725, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": -0.12516786836512983, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": -0.11082571678162415, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 0.16297899526708995, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 0.14211768387289178, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": 0.18717811648435037, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": 0.190359466471951, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": 0.28553919970793395, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 0.3526865457579732, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": 0.30900817502640315, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 0.426353051618705, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 0.4465624470318206, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 0.4654810488024336, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": 0.5202289528925523, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 0.4361317913347363, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 0.38332659686818793, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": 0.353338461739041, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 0.4785063301041708, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": 0.4654680104828007, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": 0.4745948342177642, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": 0.5137097930818598, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": 0.591939710810066, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 0.6173644340717386, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 0.6545236449926309, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 0.6845117801217779, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 0.6727772924625433, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 0.6232316779013485, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 0.6206240139770774, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": 0.5762937272644248, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 0.5547804998891737, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": 0.458948850672123, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": 0.43091646348617935, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": 0.32465415857204444, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": 0.4015802443381002, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": 0.3303910192054437, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": 0.3494269658526344, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 0.4133147319973348, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 0.4198338918080273, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 0.3872380927546093, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 0.46677184244493625, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 0.4980638095362187, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 0.5345711044760582, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": 0.4745948342177642, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": 0.687119444046049, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": 0.6740811244246788, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": 0.6271431737877551, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": 0.5254442807410945, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": 0.5815090551129669, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": 0.5645592396051902, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": 0.6988539317052835, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": 0.8976883059311304, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": 1.0417747760668583, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": 0.9478858364733929, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": 0.9557088282462061, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": 1.0404579057851047, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": 0.8709597507073223, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": 0.6936386038567266, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": 0.5345711044760582, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": 0.598302410785297, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": 0.418530059845877, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": 0.3429078060419567, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": 0.43939137124007516, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": 0.44982202693715945, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": 0.3546422937011913, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": 0.198182458244779, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": 0.2816277038215273, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": 0.24120891299529612, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": 0.22034760160109793, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": 0.3507307978147699, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": 0.3350717759495106, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": 0.3389963101555501, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": 0.31878691474241966, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": 0.27250088008656376, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": 0.27902003989725627, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": 0.2346897531846036, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": 0.22295526552536898, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": 0.3103120069885387, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": 0.2920583595186264, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": 0.33182523436378986, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": 0.33573673025019646, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": 0.295969855405033, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": 0.30900817502640315, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": 0.27902003989725627, "time": "2026-08-28 16:00"}]}, {"ticker": "QQQ", "color": "#7c3aed", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": -0.02106652809572311, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.05126188503293529, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.10533264047863151, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.12850582138392536, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": -0.09550159403395223, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.08215945957332174, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": -0.08988385320843031, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": -0.10533264047863151, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": -0.10392820527225105, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": -0.07864837155737053, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 0.5673918233782393, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 0.5280676375995381, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": 0.5477297304888806, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": 0.7064309088100182, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": 0.8686431751471229, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": 0.9697625100065971, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": 0.7583809670940834, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 0.9262250186087704, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 0.9508026347204447, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 1.023131047849119, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": 1.0280465710714508, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 0.877772003988596, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 0.8019325028439864, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": 0.6909821215398331, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 0.9353538474502595, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": 0.9251997809081135, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": 0.9128828841481399, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": 0.9634425515778848, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": 1.080010673707576, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 1.1038860722160604, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 1.123548165105403, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 1.174107832535148, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 1.1670856565032455, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 1.0863306321362884, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 1.0589441456118531, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": 1.0090866957852984, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 0.9915312557055264, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": 0.8854963976237047, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": 0.8763675687822156, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": 0.744350659382339, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": 0.8791764391949765, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": 0.7893066303386065, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": 0.8524921702737314, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 0.9212111849219847, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 0.9704647276098032, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 0.9599314635619338, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 1.0505175343735542, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 1.112312683454359, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 1.2682049913627198, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": 1.1530413044394248, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": 1.1642767860904846, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": 1.1909610550117296, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": 1.1066949426288213, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": 0.9311264974790416, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": 1.0050980997991694, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": 1.1614679156777077, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": 1.256969509711676, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": 1.494319059590184, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": 1.6530202379113215, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": 1.5322388101625048, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": 1.485892448351901, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": 1.6052694408943535, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": 1.3903908543179329, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": 1.0982683313905384, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": 0.8201901605269487, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": 0.9339494122438629, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": 0.6769377694760123, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": 0.6010982683313867, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": 0.6832577279047244, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": 0.7682260578908231, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": 0.6488490653483708, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": 0.4733087089027119, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": 0.5687962585846198, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": 0.5421119896633588, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": 0.5210454615676356, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": 0.7218796960802194, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": 0.6960380882827996, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": 0.6581183377104947, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": 0.6193559260143648, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": 0.5863516986643916, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": 0.5765206522197124, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": 0.5224498967740162, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": 0.4887434518208529, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": 0.6081204443633051, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": 0.5680940409814296, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": 0.6319958428717891, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": 0.6404224541100879, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": 0.6095248795696856, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": 0.6193559260143648, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": 0.5730095642037613, "time": "2026-08-28 16:00"}]}, {"ticker": "IWM", "color": "#ea580c", "benchmark": true, "points": [{"x": 0.0, "y": 0.0, "time": "2026-08-26 15:50"}, {"x": 1.0, "y": 0.006688515818352838, "time": "2026-08-26 15:51"}, {"x": 2.0, "y": -0.021737676409603952, "time": "2026-08-26 15:52"}, {"x": 3.0, "y": -0.04681961072837481, "time": "2026-08-26 15:53"}, {"x": 4.0, "y": -0.058524513410459014, "time": "2026-08-26 15:54"}, {"x": 5.0, "y": -0.04849173968295827, "time": "2026-08-26 15:55"}, {"x": 6.0, "y": -0.04849173968295827, "time": "2026-08-26 15:56"}, {"x": 7.0, "y": -0.04180322386462444, "time": "2026-08-26 15:57"}, {"x": 8.0, "y": -0.04180322386462444, "time": "2026-08-26 15:58"}, {"x": 9.0, "y": -0.03344257909168815, "time": "2026-08-26 15:59"}, {"x": 10.0, "y": -0.01672128954583457, "time": "2026-08-26 16:00"}, {"x": 11.6, "y": 0.19396695873187111, "time": "2026-08-27 09:30"}, {"x": 12.6, "y": 0.003344257909166914, "time": "2026-08-27 09:40"}, {"x": 13.6, "y": -0.10032773727508344, "time": "2026-08-27 09:50"}, {"x": 14.6, "y": -0.18393418500433234, "time": "2026-08-27 10:00"}, {"x": 15.6, "y": -0.08026218982008197, "time": "2026-08-27 10:10"}, {"x": 16.6, "y": -0.17557354023141505, "time": "2026-08-27 10:20"}, {"x": 17.6, "y": -0.10032773727508344, "time": "2026-08-27 10:30"}, {"x": 18.6, "y": 0.05518025550131111, "time": "2026-08-27 10:40"}, {"x": 19.6, "y": 0.06186877131964493, "time": "2026-08-27 10:50"}, {"x": 20.6, "y": 0.15383586382183012, "time": "2026-08-27 11:00"}, {"x": 21.6, "y": 0.2575078590060995, "time": "2026-08-27 11:10"}, {"x": 22.6, "y": 0.2006554745502049, "time": "2026-08-27 11:20"}, {"x": 23.6, "y": 0.22740953782355924, "time": "2026-08-27 11:30"}, {"x": 24.6, "y": 0.27088489064276716, "time": "2026-08-27 11:40"}, {"x": 25.6, "y": 0.3962945622366405, "time": "2026-08-27 11:50"}, {"x": 26.6, "y": 0.3110159855528081, "time": "2026-08-27 12:00"}, {"x": 27.6, "y": 0.2608521169152664, "time": "2026-08-27 12:10"}, {"x": 28.6, "y": 0.26754063273360024, "time": "2026-08-27 12:20"}, {"x": 29.6, "y": 0.29429469600695457, "time": "2026-08-27 12:30"}, {"x": 30.6, "y": 0.336097919871579, "time": "2026-08-27 12:40"}, {"x": 31.6, "y": 0.4029830780549933, "time": "2026-08-27 12:50"}, {"x": 32.6, "y": 0.4197043676008279, "time": "2026-08-27 13:00"}, {"x": 33.6, "y": 0.3979666911912239, "time": "2026-08-27 13:10"}, {"x": 34.6, "y": 0.3561634673265995, "time": "2026-08-27 13:20"}, {"x": 35.6, "y": 0.3611798541903689, "time": "2026-08-27 13:30"}, {"x": 36.6, "y": 0.30432746973447433, "time": "2026-08-27 13:40"}, {"x": 37.6, "y": 0.2458029563239963, "time": "2026-08-27 13:50"}, {"x": 38.6, "y": 0.18058992709518445, "time": "2026-08-27 14:00"}, {"x": 39.6, "y": 0.22740953782355924, "time": "2026-08-27 14:10"}, {"x": 40.6, "y": 0.14045883218514343, "time": "2026-08-27 14:20"}, {"x": 41.6, "y": 0.20734399036853876, "time": "2026-08-27 14:30"}, {"x": 42.6, "y": 0.25416360109691355, "time": "2026-08-27 14:40"}, {"x": 43.6, "y": 0.2876061801886207, "time": "2026-08-27 14:50"}, {"x": 44.6, "y": 0.3210153167012256, "time": "2026-08-27 15:00"}, {"x": 45.6, "y": 0.3110159855528081, "time": "2026-08-27 15:10"}, {"x": 46.6, "y": 0.3076717276436412, "time": "2026-08-27 15:20"}, {"x": 47.6, "y": 0.35783559628118294, "time": "2026-08-27 15:30"}, {"x": 48.6, "y": 0.3310815330078286, "time": "2026-08-27 15:40"}, {"x": 49.6, "y": 0.26754063273360024, "time": "2026-08-27 15:50"}, {"x": 50.6, "y": 0.2575078590060995, "time": "2026-08-27 16:00"}, {"x": 52.2, "y": 0.15718012173099702, "time": "2026-08-28 09:30"}, {"x": 53.2, "y": 0.08360644772924888, "time": "2026-08-28 09:40"}, {"x": 54.2, "y": 0.043475352819207905, "time": "2026-08-28 09:50"}, {"x": 55.2, "y": -0.3076717276436222, "time": "2026-08-28 10:00"}, {"x": 56.2, "y": -0.2809176643702679, "time": "2026-08-28 10:10"}, {"x": 57.2, "y": -0.4548190756470995, "time": "2026-08-28 10:20"}, {"x": 58.2, "y": -0.21068824827770566, "time": "2026-08-28 10:30"}, {"x": 59.2, "y": -0.21068824827770566, "time": "2026-08-28 10:40"}, {"x": 60.2, "y": -0.19396695873185207, "time": "2026-08-28 10:50"}, {"x": 61.2, "y": -0.39462243328205704, "time": "2026-08-28 11:00"}, {"x": 62.2, "y": -0.25416360109691355, "time": "2026-08-28 11:10"}, {"x": 63.2, "y": -0.2508193431877467, "time": "2026-08-28 11:20"}, {"x": 64.2, "y": -0.4514748177379325, "time": "2026-08-28 11:30"}, {"x": 65.2, "y": -0.6655073239248241, "time": "2026-08-28 11:40"}, {"x": 66.2, "y": -0.8210153167012186, "time": "2026-08-28 11:50"}, {"x": 67.2, "y": -0.75245802956324, "time": "2026-08-28 12:00"}, {"x": 68.2, "y": -1.0099658885693203, "time": "2026-08-28 12:10"}, {"x": 69.2, "y": -1.0467527255701945, "time": "2026-08-28 12:20"}, {"x": 70.2, "y": -0.8929168617483644, "time": "2026-08-28 12:30"}, {"x": 71.2, "y": -0.8226874456558022, "time": "2026-08-28 12:40"}, {"x": 72.2, "y": -0.8862283459300306, "time": "2026-08-28 12:50"}, {"x": 73.2, "y": -1.0367199518426748, "time": "2026-08-28 13:00"}, {"x": 74.2, "y": -0.9129824092033849, "time": "2026-08-28 13:10"}, {"x": 75.2, "y": -0.946424988295092, "time": "2026-08-28 13:20"}, {"x": 76.2, "y": -0.9564577620225927, "time": "2026-08-28 13:30"}, {"x": 77.2, "y": -0.8845562169754471, "time": "2026-08-28 13:40"}, {"x": 78.2, "y": -0.9096381512942181, "time": "2026-08-28 13:50"}, {"x": 79.2, "y": -0.9096381512942181, "time": "2026-08-28 14:00"}, {"x": 80.2, "y": -0.9347200856129889, "time": "2026-08-28 14:10"}, {"x": 81.2, "y": -1.0066216306601534, "time": "2026-08-28 14:20"}, {"x": 82.2, "y": -1.0367199518426748, "time": "2026-08-28 14:30"}, {"x": 83.2, "y": -1.0183265333422378, "time": "2026-08-28 14:40"}, {"x": 84.2, "y": -1.030031436024341, "time": "2026-08-28 14:50"}, {"x": 85.2, "y": -0.9698347936592794, "time": "2026-08-28 15:00"}, {"x": 86.2, "y": -0.9380643435221748, "time": "2026-08-28 15:10"}, {"x": 87.2, "y": -0.8644906695204266, "time": "2026-08-28 15:20"}, {"x": 88.2, "y": -0.9531135041134259, "time": "2026-08-28 15:30"}, {"x": 89.2, "y": -1.0333756939335077, "time": "2026-08-28 15:40"}, {"x": 90.2, "y": -1.0902280783894025, "time": "2026-08-28 15:50"}, {"x": 91.2, "y": -1.1136378837535899, "time": "2026-08-28 16:00"}]}], "frames": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.6, 12.6, 13.6, 14.6, 15.6, 16.6, 17.6, 18.6, 19.6, 20.6, 21.6, 22.6, 23.6, 24.6, 25.6, 26.6, 27.6, 28.6, 29.6, 30.6, 31.6, 32.6, 33.6, 34.6, 35.6, 36.6, 37.6, 38.6, 39.6, 40.6, 41.6, 42.6, 43.6, 44.6, 45.6, 46.6, 47.6, 48.6, 49.6, 50.6, 52.2, 53.2, 54.2, 55.2, 56.2, 57.2, 58.2, 59.2, 60.2, 61.2, 62.2, 63.2, 64.2, 65.2, 66.2, 67.2, 68.2, 69.2, 70.2, 71.2, 72.2, 73.2, 74.2, 75.2, 76.2, 77.2, 78.2, 79.2, 80.2, 81.2, 82.2, 83.2, 84.2, 85.2, 86.2, 87.2, 88.2, 89.2, 90.2, 91.2], "sessions": [{"start": -0.5, "end": 10.5, "label": "Wed Aug 26 (T0)"}, {"start": 11.1, "end": 51.1, "label": "Thu Aug 27, 2026 (T1)"}, {"start": 51.7, "end": 91.7, "label": "Fri Aug 28, 2026 (T2)"}, {"start": 92.3, "end": 132.3, "label": "Mon Aug 31, 2026 (T3)"}], "xMin": -0.5, "xMax": 91.7, "yMin": -7.26774483378257, "yMax": 6.163411332430868};
+        const individualCharts = [{"ticker": "DT", "src": "meta data/2_DT Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140488"}, {"ticker": "ANET", "src": "meta data/2_ANET Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140490"}, {"ticker": "BTSG", "src": "meta data/2_BTSG Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140491"}, {"ticker": "SMMT", "src": "meta data/2_SMMT Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140492"}, {"ticker": "LITE", "src": "meta data/2_LITE Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140493"}, {"ticker": "SMTC", "src": "meta data/2_SMTC Chart 10m 26 August-31 Aug 2026 214122.png?v=1788140494"}];
+        const liveSnapshotPayload = {"entry_date": "2026-08-26", "end_date": "2026-08-31", "deployed_capital": 250000.0, "positions": {"ANET": {"entry_price": 202.21, "shares": 206.05641000280235}, "BTSG": {"entry_price": 61.2, "shares": 680.8278867102396}, "DT": {"entry_price": 51.71, "shares": 805.775800941146}, "LITE": {"entry_price": 936.005, "shares": 44.5154317195599}, "SMMT": {"entry_price": 14.305, "shares": 2912.7344751252476}, "SMTC": {"entry_price": 139.125, "shares": 299.4908655286014}}};
+        const reportNoteStorageKey = "duo-report-note:Sun 30 Aug 2026 Runs:Dashboard 26-31 Aug 2026 214122.html";
+        const reportNotePath = "Sun 30 Aug 2026 Runs/meta data/Dashboard 26-31 Aug 2026 214122 Notes.txt";
+        const portfolioSubTabIds = new Set(['screened', 'portfolio', 'all-stocks', 'individual']);
+        let currentPortfolioSubTabId = 'screened';
+        const allStocksReplayState = {
+            frameIndex: 0,
+            playing: false,
+            timer: null,
+            initialized: false
+        };
+
+        function goToAppRoute(path) {
+            const route = path || '/';
+            if (window.location.protocol === 'file:') {
+                window.location.href = `http://127.0.0.1:8765${route}`;
+                return;
+            }
+            window.location.href = route;
+        }
+        function setPortfolioSubtabsVisible(visible) {
+            const subtabs = document.getElementById('portfolioSubtabs');
+            if (subtabs) {
+                subtabs.classList.toggle('hidden', !visible);
+            }
+        }
+        function activatePanel(id) {
+            document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+            const panel = document.getElementById(id);
+            if (panel) {
+                panel.classList.add('active');
+            }
+        }
+        function showPortfolioSubTab(id, button) {
+            if (!portfolioSubTabIds.has(id)) {
+                id = 'screened';
+            }
+            currentPortfolioSubTabId = id;
+            activatePanel(id);
+            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.portfolio-subtabs button').forEach(tab => tab.classList.remove('active'));
+            const portfolioTab = document.querySelector('.tabs button[data-main-tab="portfolio"]');
+            if (portfolioTab) {
+                portfolioTab.classList.add('active');
+            }
+            if (button) {
+                button.classList.add('active');
+            }
+            setPortfolioSubtabsVisible(true);
+            window.scrollTo(0, 0);
+        }
+        function showMainReportTab(id, button) {
+            activatePanel(id);
+            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.portfolio-subtabs button').forEach(tab => tab.classList.remove('active'));
+            if (button) {
+                button.classList.add('active');
+            }
+            setPortfolioSubtabsVisible(false);
+            window.scrollTo(0, 0);
+        }
+        function showStockChart(index, button) {
+            const chart = individualCharts[index];
+            if (!chart) {
+                return;
+            }
+            const image = document.getElementById('selectedStockChart');
+            image.src = chart.src;
+            image.alt = `${chart.ticker} chart`;
+            document.querySelectorAll('.stock-picker button').forEach(tab => tab.classList.remove('active'));
+            button.classList.add('active');
+            window.scrollTo(0, 0);
+        }
+        function updateLiveClock() {
+            const now = new Date();
+            document.getElementById('liveClockDate').firstChild.nodeValue = now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
+            document.getElementById('liveClockTime').textContent = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function screenSimChartTickers() {
+            return individualCharts.map(chart => chart.ticker).filter(Boolean);
+        }
+
+        function screenSimChartPopoutUrl(ticker, anchorDate = '', forward = false, tickersOverride = null) {
+            const chartBaseUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765/chart-popout' : '/chart-popout';
+            const params = new URLSearchParams();
+            params.set('ticker', ticker);
+            if (anchorDate) {
+                params.set('anchor', anchorDate);
+            }
+            const tickers = Array.isArray(tickersOverride) ? tickersOverride : screenSimChartTickers();
+            if (tickers.length) {
+                params.set('tickers', tickers.join(','));
+            }
+            if (forward) {
+                params.set('forward', '1');
+            }
+            return `${chartBaseUrl}?${params.toString()}`;
+        }
+
+        function openTickerChart(ticker, anchorDate = '') {
+            window.open(screenSimChartPopoutUrl(ticker, anchorDate), '_blank', 'width=1800,height=980,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+        }
+
+        function closeTickerChart() {
+            const modal = document.getElementById('tickerChartModal');
+            const image = document.getElementById('tickerChartImage');
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            image.removeAttribute('src');
+        }
+
+        function compareSelectedStockSortValues(aValue, bValue, direction) {
+            const aEmpty = aValue === null || aValue === undefined || String(aValue).trim() === '';
+            const bEmpty = bValue === null || bValue === undefined || String(bValue).trim() === '';
+            if (aEmpty || bEmpty) {
+                if (aEmpty && bEmpty) {
+                    return 0;
+                }
+                return aEmpty ? 1 : -1;
+            }
+            const aNumber = Number(aValue);
+            const bNumber = Number(bValue);
+            if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+                return (aNumber - bNumber) * direction;
+            }
+            return String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+        }
+
+        function sortSelectedStocksTable(header) {
+            const table = header.closest('table');
+            const tbody = table ? table.querySelector('tbody') : null;
+            if (!tbody) {
+                return;
+            }
+            const headers = [...table.querySelectorAll('th[data-sort-key]')];
+            const columnIndex = headers.indexOf(header);
+            if (columnIndex < 0) {
+                return;
+            }
+            const nextDirection = header.classList.contains('sort-asc') ? 'desc' : 'asc';
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                th.setAttribute('aria-sort', 'none');
+            });
+            header.classList.add(nextDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            header.setAttribute('aria-sort', nextDirection === 'asc' ? 'ascending' : 'descending');
+            const direction = nextDirection === 'asc' ? 1 : -1;
+            const rows = [...tbody.querySelectorAll('tr')];
+            rows.sort((a, b) => {
+                const aValue = a.children[columnIndex]?.getAttribute('data-sort-value') ?? a.children[columnIndex]?.textContent ?? '';
+                const bValue = b.children[columnIndex]?.getAttribute('data-sort-value') ?? b.children[columnIndex]?.textContent ?? '';
+                const result = compareSelectedStockSortValues(aValue, bValue, direction);
+                if (result !== 0) {
+                    return result;
+                }
+                return String(a.children[0]?.textContent || '').localeCompare(String(b.children[0]?.textContent || ''), undefined, { numeric: true, sensitivity: 'base' });
+            });
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function initSelectedStocksNotes() {
+            const note = document.getElementById('selectedStocksNote');
+            const status = document.getElementById('selectedStocksNoteStatus');
+            if (!note || !status) {
+                return;
+            }
+            const fallbackNote = window.localStorage ? (localStorage.getItem(reportNoteStorageKey) || '') : '';
+            note.value = fallbackNote;
+            const canUseServerNotes = Boolean(reportNotePath) && window.location.protocol !== 'file:';
+            if (canUseServerNotes) {
+                fetch(`/report-note?path=${encodeURIComponent(reportNotePath)}`, { cache: 'no-store' })
+                    .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('Unable to load note')))
+                    .then(data => {
+                        const serverNote = String(data.note || '');
+                        note.value = serverNote || fallbackNote;
+                        status.textContent = 'Saved to report folder';
+                        if (!serverNote && fallbackNote) {
+                            return fetch('/report-note', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: reportNotePath, note: fallbackNote })
+                            });
+                        }
+                    })
+                    .catch(() => {
+                        status.textContent = 'Autosaved in this browser';
+                    });
+            }
+            let noteSaveTimer = null;
+            note.addEventListener('input', () => {
+                status.textContent = 'Saving...';
+                if (noteSaveTimer) {
+                    clearTimeout(noteSaveTimer);
+                }
+                noteSaveTimer = setTimeout(() => {
+                    if (canUseServerNotes) {
+                        fetch('/report-note', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: reportNotePath, note: note.value })
+                        })
+                            .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('Unable to save note')))
+                            .then(() => {
+                                if (window.localStorage) {
+                                    localStorage.removeItem(reportNoteStorageKey);
+                                }
+                                status.textContent = 'Saved to report folder';
+                            })
+                            .catch(() => {
+                                if (window.localStorage) {
+                                    localStorage.setItem(reportNoteStorageKey, note.value);
+                                }
+                                status.textContent = 'Saved in this browser only';
+                            });
+                        return;
+                    }
+                    if (window.localStorage) {
+                        localStorage.setItem(reportNoteStorageKey, note.value);
+                    }
+                    status.textContent = 'Saved in this browser only';
+                }, 250);
+            });
+        }
+
+        function startLiveRefreshCountdown() {
+            const countdown = document.getElementById('liveRefreshCountdown');
+            const banner = document.getElementById('liveRefreshBanner');
+            const snapshot = document.getElementById('liveRefreshSnapshot');
+            if (!countdown || !banner || !snapshot) {
+                return;
+            }
+            function secondsUntilNextBarCheck() {
+                const now = new Date();
+                return Math.max(1, 63 - now.getSeconds());
+            }
+            let remaining = secondsUntilNextBarCheck();
+            countdown.textContent = String(remaining);
+            let refreshing = false;
+            function renderSnapshot(data) {
+                if (!data.active) {
+                    banner.classList.remove('active');
+                    return false;
+                }
+                banner.classList.add('active');
+                const pnl = Number(data.pnl_pct || 0);
+                const sign = pnl >= 0 ? '+' : '';
+                banner.firstChild.nodeValue = `Live ${data.session} 1-min close: next update in `;
+                snapshot.textContent = ` · ${data.timestamp || '--:--'} close · Portfolio ${sign}${pnl.toFixed(2)}%`;
+                return true;
+            }
+            function requestSnapshot() {
+                refreshing = true;
+                const liveSnapshotUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765/live-snapshot' : '/live-snapshot';
+                fetch(liveSnapshotUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(liveSnapshotPayload),
+                    cache: 'no-store'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Snapshot failed: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        const isActive = renderSnapshot(data);
+                        remaining = secondsUntilNextBarCheck();
+                        countdown.textContent = String(remaining);
+                        refreshing = false;
+                    })
+                    .catch(() => {
+                        banner.classList.remove('active');
+                        refreshing = false;
+                    });
+            }
+            requestSnapshot();
+            setInterval(() => {
+                if (refreshing) {
+                    return;
+                }
+                remaining -= 1;
+                if (remaining > 0) {
+                    countdown.textContent = String(remaining);
+                    return;
+                }
+                requestSnapshot();
+            }, 1000);
+        }
+
+        function svgEl(name, attrs = {}) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', name);
+            Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+            return el;
+        }
+
+        function darkenHexColor(hexColor, amount = 0.20) {
+            const raw = hexColor.replace('#', '');
+            const red = Math.round(parseInt(raw.slice(0, 2), 16) * (1 - amount));
+            const green = Math.round(parseInt(raw.slice(2, 4), 16) * (1 - amount));
+            const blue = Math.round(parseInt(raw.slice(4, 6), 16) * (1 - amount));
+            return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
+        }
+
+        function allStocksReplayScales(width, height) {
+            const margin = { left: 90, right: 330, top: 72, bottom: 108 };
+            const plotWidth = Math.max(width - margin.left - margin.right, 1);
+            const plotHeight = Math.max(height - margin.top - margin.bottom, 1);
+            const xSpan = Math.max(allStocksReplayData.xMax - allStocksReplayData.xMin, 1);
+            const ySpan = Math.max(allStocksReplayData.yMax - allStocksReplayData.yMin, 1);
+            return {
+                margin,
+                plotWidth,
+                plotHeight,
+                x: value => margin.left + ((value - allStocksReplayData.xMin) / xSpan) * plotWidth,
+                y: value => margin.top + plotHeight - ((value - allStocksReplayData.yMin) / ySpan) * plotHeight
+            };
+        }
+
+        function drawAllStocksReplayBase(svg, width, height, scales, currentMetrics) {
+            svg.innerHTML = '';
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.appendChild(svgEl('rect', { x: 0, y: 0, width, height, fill: '#ffffff', rx: 8 }));
+            svg.appendChild(svgEl('rect', { x: 0, y: scales.margin.top, width: scales.margin.left, height: scales.plotHeight, fill: '#ffffff' }));
+            svg.appendChild(svgEl('rect', { x: scales.margin.left, y: height - scales.margin.bottom, width: scales.plotWidth, height: scales.margin.bottom, fill: '#ffffff' }));
+
+            allStocksReplayData.sessions.forEach((session, idx) => {
+                const startX = scales.x(session.start);
+                const endX = scales.x(session.end);
+                svg.appendChild(svgEl('rect', { x: startX, y: 28, width: Math.max(endX - startX, 1), height: 28, fill: '#353945' }));
+                const text = svgEl('text', { x: (startX + endX) / 2, y: 47, fill: '#ffffff', 'font-size': idx === 0 ? 11 : 14, 'font-weight': 800, 'text-anchor': 'middle' });
+                text.textContent = session.label;
+                svg.appendChild(text);
+                svg.appendChild(svgEl('text', { x: startX + 4, y: 74, fill: '#353945', 'font-size': 16, 'font-weight': 800 })).textContent = '☼';
+                svg.appendChild(svgEl('circle', { cx: endX - 10, cy: 70, r: 4.4, fill: '#ffffff', stroke: '#353945', 'stroke-width': 2 }));
+                if (idx > 0) {
+                    svg.appendChild(svgEl('line', { x1: startX, x2: startX, y1: 28, y2: height - scales.margin.bottom, stroke: '#a3a8b9', 'stroke-width': 2.4, opacity: 0.95 }));
+                }
+            });
+
+            const yStep = 2;
+            const firstTick = Math.ceil(allStocksReplayData.yMin / yStep) * yStep;
+            for (let yValue = firstTick; yValue <= allStocksReplayData.yMax; yValue += yStep) {
+                const y = scales.y(yValue);
+                svg.appendChild(svgEl('line', { x1: scales.margin.left, x2: width - scales.margin.right, y1: y, y2: y, stroke: '#dedfe5', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
+                const label = svgEl('text', { x: scales.margin.left - 12, y: y + 4, fill: '#353945', 'font-size': 14, 'font-weight': 700, 'text-anchor': 'end' });
+                label.textContent = `${yValue.toFixed(0)}%`;
+                svg.appendChild(label);
+            }
+
+            const zeroY = scales.y(0);
+            svg.appendChild(svgEl('line', { x1: scales.margin.left, x2: width - scales.margin.right, y1: zeroY, y2: zeroY, stroke: '#868ea5', 'stroke-width': 1.2, 'stroke-dasharray': '5 4' }));
+            svg.appendChild(svgEl('rect', { x: scales.margin.left, y: scales.margin.top, width: scales.plotWidth, height: scales.plotHeight, fill: 'none', stroke: '#dedfe5' }));
+
+            allStocksReplayData.sessions.forEach(session => {
+                const labelTimes = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
+                const points = allStocksReplayData.series.length ? allStocksReplayData.series[0].points : [];
+                labelTimes.forEach(labelTime => {
+                    const point = points.find(item => item.time && item.time.endsWith(labelTime) && item.x >= session.start && item.x <= session.end);
+                    if (!point) {
+                        return;
+                    }
+                    const tickX = scales.x(point.x);
+                    const tick = svgEl('text', { x: tickX, y: height - 28, fill: '#353945', 'font-size': 11, 'font-weight': 700, 'text-anchor': 'end', transform: `rotate(-45 ${tickX} ${height - 28})` });
+                    tick.textContent = labelTime;
+                    svg.appendChild(tick);
+                });
+            });
+
+            const axisLabelX = 30;
+            const axisLabelY = scales.margin.top + scales.plotHeight / 2;
+            svg.appendChild(svgEl('rect', { x: axisLabelX - 10, y: axisLabelY - 92, width: 23, height: 184, rx: 4, fill: '#ffffff', stroke: '#353945', 'stroke-width': 1 }));
+            const axisText = svgEl('text', { x: axisLabelX + 6, y: axisLabelY, fill: '#353945', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle', transform: `rotate(-90 ${axisLabelX + 6} ${axisLabelY})` });
+            axisText.textContent = 'ALL STOCKS PLOTTING (%)';
+            svg.appendChild(axisText);
+
+            const tableX = width - 275;
+            const tableY = 62;
+            const tableW = 220;
+            const rowGap = 25;
+            const metrics = currentMetrics
+                .filter(metric => !metric.benchmark)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 22);
+            const tableH = Math.max(118, 58 + metrics.length * rowGap + 18);
+            const tRange = allStocksReplayData.sessions.length ? `T0 - T${allStocksReplayData.sessions.length - 1}` : 'T0';
+            const header = svgEl('text', { x: tableX + tableW / 2, y: 34, fill: '#22262f', 'font-size': 14, 'font-weight': 800, 'text-anchor': 'middle' });
+            header.textContent = `Stock Performance (${tRange})`;
+            svg.appendChild(header);
+            svg.appendChild(svgEl('rect', { x: tableX, y: tableY, width: tableW, height: tableH, rx: 4, fill: '#ffffff', stroke: '#dedfe5', 'stroke-width': 1.4 }));
+            const tableTitle = svgEl('text', { x: tableX + 46, y: tableY + 32, fill: '#22262f', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle' });
+            tableTitle.textContent = 'Ticker';
+            svg.appendChild(tableTitle);
+            const valueTitle = svgEl('text', { x: tableX + tableW - 38, y: tableY + 32, fill: '#22262f', 'font-size': 13, 'font-weight': 800, 'text-anchor': 'middle' });
+            valueTitle.textContent = 'P&L (%)';
+            svg.appendChild(valueTitle);
+
+            metrics.forEach((metric, idx) => {
+                const rowY = tableY + 58 + idx * rowGap;
+                const valueColor = metric.value >= 0 ? '#00a449' : '#d91e2b';
+                svg.appendChild(svgEl('line', { x1: tableX + 10, x2: tableX + tableW - 10, y1: rowY + 9, y2: rowY + 9, stroke: '#dedfe5', 'stroke-width': 0.9 }));
+                const tickerText = svgEl('text', { x: tableX + 34, y: rowY, fill: '#22262f', 'font-size': 13, 'font-weight': 700, 'text-anchor': 'start' });
+                tickerText.textContent = metric.ticker;
+                svg.appendChild(tickerText);
+                const valueText = svgEl('text', { x: tableX + tableW - 30, y: rowY, fill: valueColor, 'font-size': 15, 'font-weight': 800, 'text-anchor': 'end' });
+                valueText.textContent = `${metric.value >= 0 ? '+' : ''}${metric.value.toFixed(2)}%`;
+                svg.appendChild(valueText);
+            });
+
+            const benchmarkMetrics = currentMetrics
+                .filter(metric => metric.benchmark)
+                .sort((a, b) => ['SPY', 'QQQ', 'IWM'].indexOf(a.ticker) - ['SPY', 'QQQ', 'IWM'].indexOf(b.ticker));
+            if (benchmarkMetrics.length) {
+                const benchY = tableY + tableH + 50;
+                const benchH = 160;
+                svg.appendChild(svgEl('rect', { x: tableX, y: benchY, width: tableW, height: benchH, rx: 4, fill: '#ffffff', stroke: '#dedfe5', 'stroke-width': 1.4 }));
+                const benchTitle = svgEl('text', { x: tableX + tableW / 2, y: benchY + 24, fill: '#22262f', 'font-size': 14, 'font-weight': 800, 'text-anchor': 'middle' });
+                benchTitle.textContent = 'Benchmark Summary';
+                svg.appendChild(benchTitle);
+                const benchSubtitle = svgEl('text', { x: tableX + tableW / 2, y: benchY + 45, fill: '#676f85', 'font-size': 11.5, 'font-weight': 800, 'text-anchor': 'middle' });
+                benchSubtitle.textContent = `Performance ${tRange}`;
+                svg.appendChild(benchSubtitle);
+                benchmarkMetrics.forEach((metric, idx) => {
+                    const rowY = benchY + 74 + idx * 34;
+                    const valueColor = metric.value >= 0 ? '#22262f' : metric.color;
+                    const nameText = svgEl('text', { x: tableX + 34, y: rowY, fill: metric.color, 'font-size': 14, 'font-weight': 800, 'text-anchor': 'start' });
+                    nameText.textContent = metric.ticker;
+                    svg.appendChild(nameText);
+                    const valueText = svgEl('text', { x: tableX + tableW - 30, y: rowY, fill: valueColor, 'font-size': 14, 'font-weight': 800, 'text-anchor': 'end' });
+                    valueText.textContent = `${metric.value >= 0 ? '+' : ''}${metric.value.toFixed(2)}%`;
+                    svg.appendChild(valueText);
+                    const lineText = svgEl('text', { x: tableX + 34, y: rowY + 15, fill: metric.color, 'font-size': 10.5, 'font-weight': 400, 'text-anchor': 'start' });
+                    lineText.textContent = `${metric.ticker} Line`;
+                    svg.appendChild(lineText);
+                    svg.appendChild(svgEl('line', { x1: tableX + tableW - 66, x2: tableX + tableW - 30, y1: rowY + 14, y2: rowY + 14, stroke: metric.color, 'stroke-width': 1.1, 'stroke-dasharray': '7 5' }));
+                });
+            }
+        }
+
+        function renderAllStocksReplayFrame() {
+            const svg = document.getElementById('allStocksReplayChart');
+            if (!svg || !allStocksReplayData.series.length || !allStocksReplayData.frames.length) {
+                return;
+            }
+            const width = 2000;
+            const height = 900;
+            const scales = allStocksReplayScales(width, height);
+            const frameX = allStocksReplayData.frames[Math.min(allStocksReplayState.frameIndex, allStocksReplayData.frames.length - 1)];
+            const currentMetrics = allStocksReplayData.series
+                .map(series => {
+                    const visiblePoints = series.points.filter(point => point.x <= frameX);
+                    if (!visiblePoints.length) {
+                        return null;
+                    }
+                    return { ticker: series.ticker, color: series.color, value: visiblePoints[visiblePoints.length - 1].y, benchmark: series.benchmark };
+                })
+                .filter(metric => metric !== null);
+            drawAllStocksReplayBase(svg, width, height, scales, currentMetrics);
+
+            const status = document.getElementById('allStocksReplayStatus');
+            let latestTime = '';
+            allStocksReplayData.series.forEach(series => {
+                const visiblePoints = series.points.filter(point => point.x <= frameX);
+                if (!visiblePoints.length) {
+                    return;
+                }
+                const pathData = visiblePoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${scales.x(point.x).toFixed(2)} ${scales.y(point.y).toFixed(2)}`).join(' ');
+                svg.appendChild(svgEl('path', {
+                    d: pathData,
+                    fill: 'none',
+                    stroke: series.color,
+                    'stroke-width': series.benchmark ? 2.4 : 1.8,
+                    'stroke-dasharray': series.benchmark ? '7 5' : 'none',
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round'
+                }));
+                const lastPoint = visiblePoints[visiblePoints.length - 1];
+                latestTime = lastPoint.time || latestTime;
+                const dotX = scales.x(lastPoint.x);
+                const dotY = scales.y(lastPoint.y);
+                svg.appendChild(svgEl('circle', { cx: dotX, cy: dotY, r: series.benchmark ? 4.8 : 4.2, fill: series.color, stroke: '#ffffff', 'stroke-width': 1.5 }));
+                const pillWidth = Math.max(series.ticker.length * 7.4 + 15, 36);
+                const pillX = Math.min(dotX + 8, width - scales.margin.right - pillWidth + 6);
+                const pillY = Math.max(scales.margin.top + 2, Math.min(dotY - 10, height - scales.margin.bottom - 20));
+                const pillColor = darkenHexColor(series.color, 0.20);
+                svg.appendChild(svgEl('rect', { x: pillX, y: pillY, width: pillWidth, height: 20, rx: 10, fill: pillColor, stroke: '#ffffff', 'stroke-width': 1.1, opacity: 0.96 }));
+                const label = svgEl('text', { x: pillX + pillWidth / 2, y: pillY + 14, fill: '#ffffff', 'font-size': 11.5, 'font-weight': 800, 'text-anchor': 'middle' });
+                label.textContent = series.ticker;
+                svg.appendChild(label);
+            });
+            status.textContent = `${allStocksReplayState.playing ? 'Playing' : 'Paused'}: ${latestTime || 'start'} (${allStocksReplayState.frameIndex + 1}/${allStocksReplayData.frames.length})`;
+        }
+
+        function setAllStocksReplayPlaying(playing) {
+            const button = document.getElementById('allStocksReplayButton');
+            allStocksReplayState.playing = playing;
+            button.innerHTML = playing ? '&#10073;&#10073; Pause' : '&#9658; Replay';
+            button.classList.toggle('active', playing);
+            if (allStocksReplayState.timer) {
+                clearInterval(allStocksReplayState.timer);
+                allStocksReplayState.timer = null;
+            }
+            if (playing) {
+                allStocksReplayState.timer = setInterval(() => {
+                    if (allStocksReplayState.frameIndex >= allStocksReplayData.frames.length - 1) {
+                        setAllStocksReplayPlaying(false);
+                        document.getElementById('allStocksReplayWrap').classList.remove('active');
+                        document.getElementById('allStocksStaticImage').classList.remove('hidden');
+                        allStocksReplayState.initialized = false;
+                        return;
+                    }
+                    allStocksReplayState.frameIndex = Math.min(allStocksReplayState.frameIndex + 1, allStocksReplayData.frames.length - 1);
+                    renderAllStocksReplayFrame();
+                }, 333);
+            }
+            renderAllStocksReplayFrame();
+        }
+
+        function toggleAllStocksReplay() {
+            if (!allStocksReplayData.series.length || !allStocksReplayData.frames.length) {
+                document.getElementById('allStocksReplayStatus').textContent = 'Replay data unavailable for this run.';
+                return;
+            }
+            document.getElementById('allStocksStaticImage').classList.add('hidden');
+            document.getElementById('allStocksReplayWrap').classList.add('active');
+            if (!allStocksReplayState.initialized || allStocksReplayState.frameIndex >= allStocksReplayData.frames.length - 1) {
+                allStocksReplayState.frameIndex = 0;
+                allStocksReplayState.initialized = true;
+            }
+            setAllStocksReplayPlaying(!allStocksReplayState.playing);
+        }
+
+        window.screenSimChartPopoutUrl = screenSimChartPopoutUrl;
+        document.querySelectorAll('.screener-table th[data-sort-key]').forEach(header => {
+            header.addEventListener('click', () => sortSelectedStocksTable(header));
+        });
+        initSelectedStocksNotes();
+        document.getElementById('tickerChartClose').addEventListener('click', closeTickerChart);
+        document.getElementById('tickerChartModal').addEventListener('click', event => {
+            if (event.target.id === 'tickerChartModal') {
+                closeTickerChart();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeTickerChart();
+            }
+        });
+        updateLiveClock();
+        setInterval(updateLiveClock, 1000);
+        startLiveRefreshCountdown();
+    </script>
+</body>
+</html>
